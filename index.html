@@ -99,7 +99,7 @@
       </div>
 
       <div class="p-6 space-y-5">
-        <form id="form-login-unified" onsubmit="handleUnifiedLoginSubmit(event)" class="space-y-4">
+        <form id="form-login-unified" onsubmit="handleUnifiedLoginSubmit(event); return false;" class="space-y-4">
           <div>
             <label class="block text-xs font-bold text-[#243360] uppercase mb-1">Usuario *</label>
             <div class="relative">
@@ -127,7 +127,7 @@
             <span id="login-error-text">Usuario o clave incorrectos.</span>
           </div>
 
-          <button type="submit" class="w-full py-3 rounded-xl bg-[#243360] hover:bg-[#192447] text-white font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition-all">
+          <button type="submit" onclick="handleUnifiedLoginSubmit(event)" class="w-full py-3 rounded-xl bg-[#243360] hover:bg-[#192447] text-white font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition-all">
             <i class="fa-solid fa-right-to-bracket text-[#F2B705]"></i>
             <span>Ingresar al Sistema</span>
           </button>
@@ -1250,6 +1250,79 @@
   </div>
 
   <!-- ===================================================================== -->
+  <!-- MODAL 5B: MAPA INTERACTIVO PARA SELECCIONAR UBICACIÓN EXACTA DE SEDE  -->
+  <!-- ===================================================================== -->
+  <div id="modal-location-map" class="fixed inset-0 z-[60] hidden bg-[#192447]/85 backdrop-blur-sm overflow-y-auto">
+    <div class="min-h-screen px-3 sm:px-4 pt-6 pb-28 flex items-center justify-center">
+      <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border-2 border-[#F2B705] overflow-hidden">
+        <div class="bg-[#243360] text-white px-5 py-4 flex items-center justify-between border-b-2 border-[#F2B705]">
+          <div>
+            <h3 class="font-extrabold text-base flex items-center gap-2">
+              <i class="fa-solid fa-map-location-dot text-[#F2B705]"></i>
+              <span>Seleccionar Ubicación Exacta en el Mapa</span>
+            </h3>
+            <p class="text-[11px] text-slate-300 mt-0.5">Busca una dirección o haz clic en el punto exacto para autocompletar</p>
+          </div>
+          <button type="button" onclick="closeModal('modal-location-map')" class="text-slate-300 hover:text-white">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+
+        <div class="p-4 sm:p-5 space-y-3">
+          <!-- Buscador en Mapa -->
+          <div class="flex flex-col sm:flex-row gap-2">
+            <div class="relative flex-1">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[#243360]/50 text-xs"></i>
+              <input
+                type="text"
+                id="map-search-query"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();searchAddressOnMap();}"
+                placeholder="Buscar calle, número, ciudad (ej: Av. Libertad 425, Chillán)..."
+                class="w-full pl-8 pr-3 py-2 bg-[#f8fafe] border border-slate-300 rounded-xl text-xs font-semibold text-[#243360] focus:ring-2 focus:ring-[#F2B705] focus:outline-none"
+              />
+            </div>
+            <button type="button" onclick="searchAddressOnMap()" class="px-4 py-2 rounded-xl bg-[#243360] hover:bg-[#192447] text-[#F2B705] font-extrabold text-xs shrink-0 flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-search-location"></i>
+              <span>Buscar</span>
+            </button>
+            <button type="button" onclick="useCurrentGpsOnMap()" title="Usar mi ubicación actual GPS" class="px-3 py-2 rounded-xl bg-[#f1f4fa] hover:bg-[#dfe6f5] text-[#243360] font-extrabold text-xs shrink-0 flex items-center justify-center gap-1 border border-[#dfe6f5]">
+              <i class="fa-solid fa-crosshairs text-rose-600"></i>
+              <span class="hidden sm:inline">Mi GPS</span>
+            </button>
+          </div>
+
+          <!-- Contenedor del Mapa Leaflet -->
+          <div class="relative rounded-2xl overflow-hidden border-2 border-[#243360] bg-slate-100">
+            <div id="client-location-leaflet-map" class="w-full h-72 sm:h-80"></div>
+          </div>
+
+          <!-- Dirección detectada y Coordenadas -->
+          <div class="bg-[#f8fafe] p-3.5 rounded-xl border border-[#dfe6f5] space-y-1.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-[#243360]">Dirección Detectada del Punto:</span>
+              <span id="map-selected-coords" class="text-[10px] font-mono text-slate-500">Haz clic en el mapa</span>
+            </div>
+            <input
+              type="text"
+              id="map-selected-address-input"
+              placeholder="Selecciona un punto en el mapa o escribe/ajusta la dirección aquí..."
+              class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-[#243360] focus:ring-2 focus:ring-[#F2B705] focus:outline-none"
+            />
+          </div>
+
+          <div class="pt-2 border-t border-slate-200 flex justify-end gap-2">
+            <button type="button" onclick="closeModal('modal-location-map')" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-50">Cancelar</button>
+            <button type="button" onclick="confirmLocationFromMap()" class="px-5 py-2.5 rounded-xl bg-[#F2B705] hover:bg-[#dca500] text-[#243360] text-xs font-extrabold shadow-sm flex items-center gap-1.5">
+              <i class="fa-solid fa-check"></i>
+              <span>Usar Esta Ubicación</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
   <!-- MODAL 6: CREAR / EDITAR REPUESTO (SOLO GERENCIA)                      -->
   <!-- ===================================================================== -->
   <div id="modal-part" class="fixed inset-0 z-50 hidden bg-[#192447]/80 backdrop-blur-sm overflow-y-auto">
@@ -1887,6 +1960,11 @@
     let assignPhotoData = '';
     let machinePhotoData = '';
     let pmovDraftItems = [];
+    let locationMapInstance = null;
+    let locationMapMarker = null;
+    let activeMapTargetRow = null;
+    let selectedMapLat = null;
+    let selectedMapLng = null;
 
     const DEFAULT_USERS = [
       { id: 'usr-gerencia', name: 'Gerencia Operaciones', password: '123', role: 'gerencia', warehouse: 'Chillán' },
@@ -3572,8 +3650,16 @@
       div.className = 'loc-row p-3 rounded-xl bg-[#f8fafe] border border-[#dfe6f5] grid grid-cols-1 sm:grid-cols-2 gap-2';
       div.innerHTML = `
         <input type="hidden" class="loc-id" value="${escapeHtml(loc.id || 'loc-' + Date.now() + Math.random().toString(36).slice(2, 5))}" />
+        <input type="hidden" class="loc-lat" value="${loc.lat != null ? escapeHtml(loc.lat) : ''}" />
+        <input type="hidden" class="loc-lng" value="${loc.lng != null ? escapeHtml(loc.lng) : ''}" />
         <input type="text" class="loc-name px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold" placeholder="Nombre Sede *" value="${escapeHtml(loc.name || '')}" required />
-        <input type="text" class="loc-address px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs" placeholder="Dirección completa *" value="${escapeHtml(loc.address || '')}" required />
+        <div class="flex gap-1.5">
+          <input type="text" class="loc-address flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs" placeholder="Dirección completa *" value="${escapeHtml(loc.address || '')}" required />
+          <button type="button" onclick="openLocationMapPicker(this)" title="Buscar punto exacto en mapa" class="px-2.5 py-1.5 rounded-lg bg-[#243360] hover:bg-[#192447] text-[#F2B705] text-xs font-extrabold shrink-0 flex items-center gap-1">
+            <i class="fa-solid fa-map-location-dot"></i>
+            <span>Mapa</span>
+          </button>
+        </div>
         <input type="text" class="loc-contact px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs" placeholder="Contacto" value="${escapeHtml(loc.contact || '')}" />
         <div class="flex gap-1.5">
           <input type="text" class="loc-phone flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs" placeholder="Teléfono" value="${escapeHtml(loc.phone || '')}" />
@@ -3582,16 +3668,176 @@
       cont.appendChild(div);
     }
 
+    function openLocationMapPicker(btnEl) {
+      activeMapTargetRow = btnEl.closest('.loc-row');
+      if (!activeMapTargetRow) return;
+
+      const currentAddr = activeMapTargetRow.querySelector('.loc-address')?.value.trim() || '';
+      const existingLat = parseFloat(activeMapTargetRow.querySelector('.loc-lat')?.value);
+      const existingLng = parseFloat(activeMapTargetRow.querySelector('.loc-lng')?.value);
+
+      const hasCoords = !isNaN(existingLat) && !isNaN(existingLng);
+      const startLat = hasCoords ? existingLat : -36.6066;
+      const startLng = hasCoords ? existingLng : -72.1034;
+      const startZoom = hasCoords ? 16 : 13;
+
+      selectedMapLat = hasCoords ? existingLat : null;
+      selectedMapLng = hasCoords ? existingLng : null;
+
+      document.getElementById('map-search-query').value = currentAddr;
+      document.getElementById('map-selected-address-input').value = currentAddr;
+      document.getElementById('map-selected-coords').textContent = hasCoords
+        ? `Lat: ${existingLat.toFixed(5)}, Lng: ${existingLng.toFixed(5)}`
+        : 'Haz clic en el punto exacto del mapa';
+
+      document.getElementById('modal-location-map').classList.remove('hidden');
+
+      setTimeout(() => {
+        if (typeof L === 'undefined') {
+          showToast('No se pudo cargar la librería de mapas.', 'error');
+          return;
+        }
+        if (!locationMapInstance) {
+          locationMapInstance = L.map('client-location-leaflet-map').setView([startLat, startLng], startZoom);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+          }).addTo(locationMapInstance);
+
+          locationMapInstance.on('click', (e) => {
+            setMapMarkerAndReverseGeocode(e.latlng.lat, e.latlng.lng, true);
+          });
+        } else {
+          locationMapInstance.invalidateSize();
+          locationMapInstance.setView([startLat, startLng], startZoom);
+        }
+
+        if (hasCoords) {
+          setMapMarkerAndReverseGeocode(existingLat, existingLng, false);
+        } else if (locationMapMarker) {
+          locationMapInstance.removeLayer(locationMapMarker);
+          locationMapMarker = null;
+          if (currentAddr) searchAddressOnMap();
+        } else if (currentAddr) {
+          searchAddressOnMap();
+        }
+      }, 120);
+    }
+
+    async function setMapMarkerAndReverseGeocode(lat, lng, fetchAddress = true) {
+      selectedMapLat = lat;
+      selectedMapLng = lng;
+      document.getElementById('map-selected-coords').textContent = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+
+      if (locationMapInstance) {
+        if (!locationMapMarker) {
+          locationMapMarker = L.marker([lat, lng], { draggable: true }).addTo(locationMapInstance);
+          locationMapMarker.on('dragend', () => {
+            const pos = locationMapMarker.getLatLng();
+            setMapMarkerAndReverseGeocode(pos.lat, pos.lng, true);
+          });
+        } else {
+          locationMapMarker.setLatLng([lat, lng]);
+        }
+        locationMapInstance.panTo([lat, lng]);
+      }
+
+      if (fetchAddress) {
+        const addrInput = document.getElementById('map-selected-address-input');
+        addrInput.value = 'Buscando dirección exacta...';
+        try {
+          const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=es`);
+          const data = await resp.json();
+          if (data && data.address) {
+            const a = data.address;
+            const street = [a.road || a.pedestrian || a.footway, a.house_number].filter(Boolean).join(' ');
+            const city = a.city || a.town || a.village || a.municipality || a.county || '';
+            const cleanAddr = [street, city].filter(Boolean).join(', ') || data.display_name;
+            addrInput.value = cleanAddr;
+          } else if (data && data.display_name) {
+            addrInput.value = data.display_name;
+          } else {
+            addrInput.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          }
+        } catch (err) {
+          addrInput.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        }
+      }
+    }
+
+    async function searchAddressOnMap() {
+      const q = document.getElementById('map-search-query').value.trim();
+      if (!q) return;
+      const addrInput = document.getElementById('map-selected-address-input');
+      addrInput.value = 'Buscando en mapa...';
+      try {
+        const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=1&accept-language=es`);
+        const results = await resp.json();
+        if (results && results.length > 0) {
+          const hit = results[0];
+          const lat = parseFloat(hit.lat);
+          const lng = parseFloat(hit.lon);
+          if (locationMapInstance) locationMapInstance.setView([lat, lng], 16);
+          await setMapMarkerAndReverseGeocode(lat, lng, true);
+        } else {
+          addrInput.value = q;
+          showToast('No se encontró la dirección exacta. Haz clic directamente sobre el punto en el mapa.', 'error');
+        }
+      } catch (err) {
+        addrInput.value = q;
+        showToast('Error al buscar dirección. Puedes marcar el punto directo en el mapa.', 'error');
+      }
+    }
+
+    function useCurrentGpsOnMap() {
+      if (!navigator.geolocation) {
+        showToast('Tu dispositivo no soporta geolocalización GPS.', 'error');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          if (locationMapInstance) locationMapInstance.setView([latitude, longitude], 17);
+          setMapMarkerAndReverseGeocode(latitude, longitude, true);
+        },
+        () => {
+          showToast('No se pudo obtener tu ubicación GPS. Verifica los permisos.', 'error');
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+
+    function confirmLocationFromMap() {
+      if (!activeMapTargetRow) return;
+      const chosenAddress = document.getElementById('map-selected-address-input').value.trim();
+      if (!chosenAddress) {
+        showToast('Selecciona un punto en el mapa o ingresa una dirección.', 'error');
+        return;
+      }
+      activeMapTargetRow.querySelector('.loc-address').value = chosenAddress;
+      if (selectedMapLat !== null && selectedMapLng !== null) {
+        activeMapTargetRow.querySelector('.loc-lat').value = selectedMapLat;
+        activeMapTargetRow.querySelector('.loc-lng').value = selectedMapLng;
+      }
+      closeModal('modal-location-map');
+      showToast('Ubicación y dirección asignadas a la sucursal.');
+    }
+
     function saveClient(e) {
       e.preventDefault();
       const id = document.getElementById('client-id').value;
-      const locations = Array.from(document.querySelectorAll('#client-locations-container .loc-row')).map(row => ({
-        id: row.querySelector('.loc-id').value,
-        name: row.querySelector('.loc-name').value.trim(),
-        address: row.querySelector('.loc-address').value.trim(),
-        contact: row.querySelector('.loc-contact').value.trim(),
-        phone: row.querySelector('.loc-phone').value.trim()
-      }));
+      const locations = Array.from(document.querySelectorAll('#client-locations-container .loc-row')).map(row => {
+        const latVal = parseFloat(row.querySelector('.loc-lat')?.value);
+        const lngVal = parseFloat(row.querySelector('.loc-lng')?.value);
+        return {
+          id: row.querySelector('.loc-id').value,
+          name: row.querySelector('.loc-name').value.trim(),
+          address: row.querySelector('.loc-address').value.trim(),
+          contact: row.querySelector('.loc-contact').value.trim(),
+          phone: row.querySelector('.loc-phone').value.trim(),
+          lat: !isNaN(latVal) ? latVal : null,
+          lng: !isNaN(lngVal) ? lngVal : null
+        };
+      });
       const payload = {
         name: document.getElementById('client-name').value.trim(),
         industry: document.getElementById('client-industry').value.trim(),
@@ -4096,26 +4342,37 @@
     }
 
     function handleUnifiedLoginSubmit(event) {
-      event.preventDefault();
+      if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+      }
       const errBox = document.getElementById('login-error-box');
       if (errBox) errBox.classList.add('hidden');
 
-      const username = document.getElementById('login-username').value.trim();
-      const password = document.getElementById('login-password').value.trim();
+      const usernameEl = document.getElementById('login-username');
+      const passwordEl = document.getElementById('login-password');
+      const username = usernameEl ? usernameEl.value.trim() : '';
+      const password = passwordEl ? passwordEl.value.trim() : '';
       if (!username || !password) {
         showLoginError('Debes ingresar usuario y clave de acceso.');
-        return;
+        return false;
       }
 
       const normInput = normalizeLoginText(username);
-      const usersPool = (appState.users && appState.users.length) ? appState.users : DEFAULT_USERS;
+      const storedUsers = Array.isArray(appState.users) ? appState.users : [];
+      const usersPool = [...storedUsers];
+      DEFAULT_USERS.forEach(defU => {
+        if (!usersPool.some(u => normalizeLoginText(u.name) === normalizeLoginText(defU.name))) {
+          usersPool.push(defU);
+        }
+      });
+
       const userMatch = usersPool.find(
         u => normalizeLoginText(u.name) === normInput && String(u.password || '').trim() === password
       );
 
       if (!userMatch) {
-        showLoginError('Usuario o clave incorrectos. Usa por ejemplo: Gerencia Operaciones (clave: 123).');
-        return;
+        showLoginError('Usuario o clave incorrectos. Usa: Gerencia Operaciones (clave: 123).');
+        return false;
       }
 
       currentSession = {
@@ -4145,6 +4402,7 @@
         pendingDeepLinkMachineCode = null;
         openMachineByScannedCode(code);
       }
+      return false;
     }
 
     openAuthScreen();
