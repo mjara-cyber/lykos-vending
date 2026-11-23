@@ -184,6 +184,15 @@
 
         <!-- Actions & Active User Role Badge -->
         <div class="flex items-center gap-2">
+          <!-- Reloj en Vivo Hora Oficial de Chile -->
+          <div id="chile-live-clock-box" title="Hora oficial de Chile (America/Santiago)" class="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#f8fafe] border border-[#dfe6f5]">
+            <i class="fa-regular fa-clock text-[#dca500] text-sm"></i>
+            <div class="leading-tight">
+              <p id="chile-clock-date" class="text-[10px] font-bold uppercase text-slate-500">--/--/----</p>
+              <p id="chile-clock-time" class="text-xs font-mono font-black text-[#243360]">--:--:--</p>
+            </div>
+          </div>
+
           <!-- Indicador de Perfil Activo -->
           <div id="active-user-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#f1f4fa] border border-[#dfe6f5]">
             <span id="header-role-icon" class="w-7 h-7 rounded-lg bg-[#243360] text-[#F2B705] flex items-center justify-center text-xs shrink-0">
@@ -1937,6 +1946,65 @@
 
   <script>
     // =========================================================================
+    // 0. ZONA HORARIA OFICIAL DE CHILE (America/Santiago) Y RELOJ EN VIVO
+    // =========================================================================
+    const CHILE_TIMEZONE = 'America/Santiago';
+
+    function getChileDateParts(dateObj = new Date()) {
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: CHILE_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      const parts = {};
+      formatter.formatToParts(dateObj).forEach(p => {
+        if (p.type !== 'literal') parts[p.type] = p.value;
+      });
+      if (parts.hour === '24') parts.hour = '00';
+      return parts;
+    }
+
+    function getChileNowDateTimeLocal() {
+      const p = getChileDateParts(new Date());
+      return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+    }
+
+    function getChileTodayDateStr(addMonths = 0) {
+      const now = new Date();
+      if (addMonths !== 0) {
+        now.setMonth(now.getMonth() + Number(addMonths));
+      }
+      const p = getChileDateParts(now);
+      return `${p.year}-${p.month}-${p.day}`;
+    }
+
+    function getChileTodayMidnight() {
+      const todayStr = getChileTodayDateStr(0);
+      return new Date(todayStr + 'T00:00:00');
+    }
+
+    function formatChileDisplayDateTime(dateObj = new Date()) {
+      const p = getChileDateParts(dateObj);
+      return `${p.day}-${p.month}-${p.year} ${p.hour}:${p.minute}:${p.second}`;
+    }
+
+    function updateChileLiveClock() {
+      const p = getChileDateParts(new Date());
+      const dateEl = document.getElementById('chile-clock-date');
+      const timeEl = document.getElementById('chile-clock-time');
+      if (dateEl) dateEl.textContent = `${p.day}/${p.month}/${p.year}`;
+      if (timeEl) timeEl.textContent = `${p.hour}:${p.minute}:${p.second}`;
+    }
+
+    setInterval(updateChileLiveClock, 1000);
+    updateChileLiveClock();
+
+    // =========================================================================
     // 1. ESTADO GLOBAL, USUARIOS POR DEFECTO Y PERSISTENCIA
     // =========================================================================
     const STORAGE_KEY = 'lykos_vending_inventory_v1';
@@ -2352,8 +2420,7 @@
       if (!machine.nextMaintenanceDate || machine.status === 'Retirada' || machine.status === 'Bodega') {
         return { isDueSoon: false, isOverdue: false, daysLeft: null, label: 'Sin fecha programada' };
       }
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const today = getChileTodayMidnight();
       const target = new Date(machine.nextMaintenanceDate + 'T00:00:00');
       const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
       if (diffDays < 0) {
@@ -2800,7 +2867,7 @@
       } else {
         document.getElementById('rev-work-location-badge').textContent = 'Revisando en el Lugar';
       }
-      document.getElementById('rev-work-started-at').textContent = 'Iniciada: ' + new Date().toLocaleString('es-CL');
+      document.getElementById('rev-work-started-at').textContent = 'Iniciada (Chile): ' + formatChileDisplayDateTime(new Date());
       switchRevisionStep('work');
     }
 
@@ -2886,7 +2953,7 @@
       m.logs = m.logs || [];
       m.logs.unshift({
         id: 'log-' + Date.now(),
-        date: new Date().toISOString().slice(0, 16),
+        date: getChileNowDateTimeLocal(),
         type: 'Avance de Revisión (En Proceso)',
         tech,
         locationText: `${info.clientName} - ${info.locationName}`,
@@ -2969,10 +3036,8 @@
       } else if (finalStatus === 'Operativa') {
         const nextM = document.getElementById('rev-next-maintenance-months').value;
         if (nextM !== 'KEEP') {
-          const d = new Date();
-          d.setMonth(d.getMonth() + Number(nextM));
           m.maintMonths = Number(nextM);
-          m.nextMaintenanceDate = d.toISOString().slice(0, 10);
+          m.nextMaintenanceDate = getChileTodayDateStr(Number(nextM));
         }
       }
 
@@ -2989,7 +3054,7 @@
       m.logs = m.logs || [];
       m.logs.unshift({
         id: 'log-' + Date.now(),
-        date: new Date().toISOString().slice(0, 16),
+        date: getChileNowDateTimeLocal(),
         type: 'Revisión Técnica Completada',
         tech,
         locationText: `${info.clientName} - ${info.locationName}`,
@@ -3203,7 +3268,7 @@
       m.logs = m.logs || [];
       m.logs.unshift({
         id: 'log-' + Date.now(),
-        date: new Date().toISOString().slice(0, 16),
+        date: getChileNowDateTimeLocal(),
         type: 'Asignación / Traslado',
         tech: document.getElementById('assign-tech').value.trim(),
         locationText: `${info.clientName} - ${info.locationName}`,
@@ -3403,7 +3468,7 @@
       populateAllWarehouseSelects();
       document.getElementById('pmov-id').value = '';
       document.getElementById('pmov-doc-number').value = `${type === 'INGRESO' ? 'OC' : 'TR'}-${Date.now().toString().slice(-4)}`;
-      document.getElementById('pmov-date').value = new Date().toISOString().slice(0, 16);
+      document.getElementById('pmov-date').value = getChileNowDateTimeLocal();
       document.getElementById('pmov-user').value = currentSession?.name || '';
       document.getElementById('pmov-notes').value = '';
       switchPartsMovementType(type);
@@ -3606,24 +3671,24 @@
             </div>`
           : '';
         return `
-        <div class="bg-white rounded-2xl border border-[#dfe6f5] shadow-sm p-5 space-y-3">
-          <div class="flex items-start justify-between gap-2">
+        <div class="bg-white rounded-2xl border border-[#dfe6f5] shadow-sm overflow-hidden">
+          <div class="p-4 bg-[#f8fafe] border-b border-[#dfe6f5] flex items-center justify-between gap-2">
             <div>
               <h3 class="font-extrabold text-base text-[#243360]">${escapeHtml(c.name)}</h3>
-              <p class="text-xs text-slate-500">${escapeHtml(c.industry || 'Cliente Corporativo')} • <strong>${assignedCount} máquina(s)</strong></p>
+              <p class="text-xs text-slate-500">${escapeHtml(c.industry || 'Cliente Corporativo')} • <strong>${assignedCount}</strong> máquina(s)</p>
             </div>
             ${adminBtns}
           </div>
-          <div class="space-y-2">
+          <div class="p-4 space-y-2.5">
             ${(c.locations || []).map(l => `
               <div class="p-3 rounded-xl bg-[#f8fafe] border border-[#dfe6f5] flex items-center justify-between gap-2 text-xs">
                 <div>
                   <p class="font-extrabold text-[#243360]">${escapeHtml(l.name)}</p>
-                  <p class="text-slate-500">${escapeHtml(l.address)}</p>
-                  ${l.contact ? `<p class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(l.contact)} ${l.phone ? '• ' + escapeHtml(l.phone) : ''}</p>` : ''}
+                  <p class="text-slate-600">${escapeHtml(l.address)}</p>
+                  <p class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(l.contact || '')} ${l.phone ? '• ' + escapeHtml(l.phone) : ''}</p>
                 </div>
                 <a href="${buildWazeUrl(l.address, l.lat, l.lng)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-[#33ccff] text-slate-950 font-extrabold shrink-0">
-                  <i class="fa-brands fa-waze"></i> Waze
+                  <i class="fa-brands fa-waze mr-1"></i>Waze
                 </a>
               </div>`).join('')}
           </div>
@@ -3639,205 +3704,105 @@
       document.getElementById('client-industry').value = c ? (c.industry || '') : '';
       const cont = document.getElementById('client-locations-container');
       cont.innerHTML = '';
-      const locs = c?.locations?.length ? c.locations : [{ id: 'loc-' + Date.now(), name: 'Sede Principal', address: '', contact: '', phone: '' }];
-      locs.forEach(l => addLocationRow(l));
+      if (c && c.locations?.length) c.locations.forEach(l => addLocationRow(l));
+      else addLocationRow();
       document.getElementById('modal-client').classList.remove('hidden');
     }
 
-    function addLocationRow(loc = {}) {
+    function addLocationRow(loc = null) {
       const cont = document.getElementById('client-locations-container');
-      const div = document.createElement('div');
-      div.className = 'loc-row p-3 rounded-xl bg-[#f8fafe] border border-[#dfe6f5] grid grid-cols-1 sm:grid-cols-2 gap-2';
-      div.innerHTML = `
-        <input type="hidden" class="loc-id" value="${escapeHtml(loc.id || 'loc-' + Date.now() + Math.random().toString(36).slice(2, 5))}" />
-        <input type="hidden" class="loc-lat" value="${loc.lat != null ? escapeHtml(loc.lat) : ''}" />
-        <input type="hidden" class="loc-lng" value="${loc.lng != null ? escapeHtml(loc.lng) : ''}" />
-        <input type="text" class="loc-name px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold" placeholder="Nombre Sede *" value="${escapeHtml(loc.name || '')}" required />
-        <div class="flex gap-1.5">
-          <input type="text" class="loc-address flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs" placeholder="Dirección completa *" value="${escapeHtml(loc.address || '')}" required />
-          <button type="button" onclick="openLocationMapPicker(this)" title="Buscar punto exacto en mapa" class="px-2.5 py-1.5 rounded-lg bg-[#243360] hover:bg-[#192447] text-[#F2B705] text-xs font-extrabold shrink-0 flex items-center gap-1">
-            <i class="fa-solid fa-map-location-dot"></i>
-            <span>Mapa</span>
-          </button>
+      const row = document.createElement('div');
+      row.className = 'client-loc-row p-3 rounded-xl bg-[#f8fafe] border border-[#dfe6f5] space-y-2';
+      row.dataset.locId = loc?.id || ('loc-' + Date.now() + Math.random().toString(36).slice(2, 5));
+      row.dataset.lat = loc?.lat || '';
+      row.dataset.lng = loc?.lng || '';
+      row.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input type="text" class="loc-name px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold" placeholder="Nombre sucursal / punto *" value="${escapeHtml(loc?.name || '')}" required />
+          <div class="flex gap-1">
+            <input type="text" class="loc-address flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs" placeholder="Dirección exacta *" value="${escapeHtml(loc?.address || '')}" required />
+            <button type="button" onclick="openLocationMapPicker(this)" title="Elegir en mapa" class="px-2.5 py-1.5 rounded-lg bg-[#243360] text-[#F2B705] text-xs"><i class="fa-solid fa-map-pin"></i></button>
+          </div>
         </div>
-        <input type="text" class="loc-contact px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs" placeholder="Contacto" value="${escapeHtml(loc.contact || '')}" />
-        <div class="flex gap-1.5">
-          <input type="text" class="loc-phone flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs" placeholder="Teléfono" value="${escapeHtml(loc.phone || '')}" />
-          <button type="button" onclick="this.closest('.loc-row').remove()" class="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-600 text-xs font-bold"><i class="fa-solid fa-trash"></i></button>
+        <div class="flex gap-2">
+          <input type="text" class="loc-contact flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs" placeholder="Contacto sede" value="${escapeHtml(loc?.contact || '')}" />
+          <input type="text" class="loc-phone flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs" placeholder="Teléfono" value="${escapeHtml(loc?.phone || '')}" />
+          <button type="button" onclick="this.closest('.client-loc-row').remove()" class="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-600 text-xs font-bold"><i class="fa-solid fa-trash"></i></button>
         </div>`;
-      cont.appendChild(div);
+      cont.appendChild(row);
     }
 
-    function openLocationMapPicker(btnEl) {
-      activeMapTargetRow = btnEl.closest('.loc-row');
-      if (!activeMapTargetRow) return;
-
-      const currentAddr = activeMapTargetRow.querySelector('.loc-address')?.value.trim() || '';
-      const existingLat = parseFloat(activeMapTargetRow.querySelector('.loc-lat')?.value);
-      const existingLng = parseFloat(activeMapTargetRow.querySelector('.loc-lng')?.value);
-
-      const hasCoords = !isNaN(existingLat) && !isNaN(existingLng);
-      const startLat = hasCoords ? existingLat : -36.6066;
-      const startLng = hasCoords ? existingLng : -72.1034;
-      const startZoom = hasCoords ? 16 : 13;
-
-      selectedMapLat = hasCoords ? existingLat : null;
-      selectedMapLng = hasCoords ? existingLng : null;
-
-      document.getElementById('map-search-query').value = currentAddr;
+    function openLocationMapPicker(btn) {
+      activeMapTargetRow = btn.closest('.client-loc-row');
+      const currentAddr = activeMapTargetRow.querySelector('.loc-address').value;
       document.getElementById('map-selected-address-input').value = currentAddr;
-      document.getElementById('map-selected-coords').textContent = hasCoords
-        ? `Lat: ${existingLat.toFixed(5)}, Lng: ${existingLng.toFixed(5)}`
-        : 'Haz clic en el punto exacto del mapa';
-
       document.getElementById('modal-location-map').classList.remove('hidden');
-
       setTimeout(() => {
-        if (typeof L === 'undefined') {
-          showToast('No se pudo cargar la librería de mapas.', 'error');
-          return;
+        if (!locationMapInstance && window.L) {
+          locationMapInstance = L.map('client-location-leaflet-map').setView([-36.6066, -72.1034], 13);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(locationMapInstance);
+          locationMapInstance.on('click', e => setMapMarker(e.latlng.lat, e.latlng.lng));
         }
-        if (!locationMapInstance) {
-          locationMapInstance = L.map('client-location-leaflet-map').setView([startLat, startLng], startZoom);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap'
-          }).addTo(locationMapInstance);
-
-          locationMapInstance.on('click', (e) => {
-            setMapMarkerAndReverseGeocode(e.latlng.lat, e.latlng.lng, true);
-          });
-        } else {
-          locationMapInstance.invalidateSize();
-          locationMapInstance.setView([startLat, startLng], startZoom);
-        }
-
-        if (hasCoords) {
-          setMapMarkerAndReverseGeocode(existingLat, existingLng, false);
-        } else if (locationMapMarker) {
-          locationMapInstance.removeLayer(locationMapMarker);
-          locationMapMarker = null;
-          if (currentAddr) searchAddressOnMap();
-        } else if (currentAddr) {
-          searchAddressOnMap();
-        }
-      }, 120);
+        if (locationMapInstance) locationMapInstance.invalidateSize();
+      }, 150);
     }
 
-    async function setMapMarkerAndReverseGeocode(lat, lng, fetchAddress = true) {
+    function setMapMarker(lat, lng) {
       selectedMapLat = lat;
       selectedMapLng = lng;
-      document.getElementById('map-selected-coords').textContent = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
-
-      if (locationMapInstance) {
-        if (!locationMapMarker) {
-          locationMapMarker = L.marker([lat, lng], { draggable: true }).addTo(locationMapInstance);
-          locationMapMarker.on('dragend', () => {
-            const pos = locationMapMarker.getLatLng();
-            setMapMarkerAndReverseGeocode(pos.lat, pos.lng, true);
-          });
-        } else {
-          locationMapMarker.setLatLng([lat, lng]);
-        }
-        locationMapInstance.panTo([lat, lng]);
-      }
-
-      if (fetchAddress) {
-        const addrInput = document.getElementById('map-selected-address-input');
-        addrInput.value = 'Buscando dirección exacta...';
-        try {
-          const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=es`);
-          const data = await resp.json();
-          if (data && data.address) {
-            const a = data.address;
-            const street = [a.road || a.pedestrian || a.footway, a.house_number].filter(Boolean).join(' ');
-            const city = a.city || a.town || a.village || a.municipality || a.county || '';
-            const cleanAddr = [street, city].filter(Boolean).join(', ') || data.display_name;
-            addrInput.value = cleanAddr;
-          } else if (data && data.display_name) {
-            addrInput.value = data.display_name;
-          } else {
-            addrInput.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-          }
-        } catch (err) {
-          addrInput.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-        }
-      }
+      document.getElementById('map-selected-coords').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      if (locationMapMarker) locationMapMarker.setLatLng([lat, lng]);
+      else locationMapMarker = L.marker([lat, lng]).addTo(locationMapInstance);
     }
 
     async function searchAddressOnMap() {
       const q = document.getElementById('map-search-query').value.trim();
       if (!q) return;
-      const addrInput = document.getElementById('map-selected-address-input');
-      addrInput.value = 'Buscando en mapa...';
       try {
-        const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=1&accept-language=es`);
-        const results = await resp.json();
-        if (results && results.length > 0) {
-          const hit = results[0];
-          const lat = parseFloat(hit.lat);
-          const lng = parseFloat(hit.lon);
-          if (locationMapInstance) locationMapInstance.setView([lat, lng], 16);
-          await setMapMarkerAndReverseGeocode(lat, lng, true);
-        } else {
-          addrInput.value = q;
-          showToast('No se encontró la dirección exacta. Haz clic directamente sobre el punto en el mapa.', 'error');
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ', Chile')}&limit=1`);
+        const data = await res.json();
+        if (data?.[0]) {
+          const lat = parseFloat(data[0].lat);
+          const lng = parseFloat(data[0].lon);
+          locationMapInstance.setView([lat, lng], 16);
+          setMapMarker(lat, lng);
+          document.getElementById('map-selected-address-input').value = data[0].display_name;
         }
-      } catch (err) {
-        addrInput.value = q;
-        showToast('Error al buscar dirección. Puedes marcar el punto directo en el mapa.', 'error');
-      }
+      } catch (e) {}
     }
 
     function useCurrentGpsOnMap() {
-      if (!navigator.geolocation) {
-        showToast('Tu dispositivo no soporta geolocalización GPS.', 'error');
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          if (locationMapInstance) locationMapInstance.setView([latitude, longitude], 17);
-          setMapMarkerAndReverseGeocode(latitude, longitude, true);
-        },
-        () => {
-          showToast('No se pudo obtener tu ubicación GPS. Verifica los permisos.', 'error');
-        },
-        { enableHighAccuracy: true, timeout: 8000 }
-      );
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(pos => {
+        const { latitude, longitude } = pos.coords;
+        locationMapInstance.setView([latitude, longitude], 16);
+        setMapMarker(latitude, longitude);
+      });
     }
 
     function confirmLocationFromMap() {
-      if (!activeMapTargetRow) return;
-      const chosenAddress = document.getElementById('map-selected-address-input').value.trim();
-      if (!chosenAddress) {
-        showToast('Selecciona un punto en el mapa o ingresa una dirección.', 'error');
-        return;
-      }
-      activeMapTargetRow.querySelector('.loc-address').value = chosenAddress;
-      if (selectedMapLat !== null && selectedMapLng !== null) {
-        activeMapTargetRow.querySelector('.loc-lat').value = selectedMapLat;
-        activeMapTargetRow.querySelector('.loc-lng').value = selectedMapLng;
+      if (activeMapTargetRow) {
+        activeMapTargetRow.querySelector('.loc-address').value = document.getElementById('map-selected-address-input').value.trim();
+        if (selectedMapLat) activeMapTargetRow.dataset.lat = selectedMapLat;
+        if (selectedMapLng) activeMapTargetRow.dataset.lng = selectedMapLng;
       }
       closeModal('modal-location-map');
-      showToast('Ubicación y dirección asignadas a la sucursal.');
     }
 
     function saveClient(e) {
       e.preventDefault();
       const id = document.getElementById('client-id').value;
-      const locations = Array.from(document.querySelectorAll('#client-locations-container .loc-row')).map(row => {
-        const latVal = parseFloat(row.querySelector('.loc-lat')?.value);
-        const lngVal = parseFloat(row.querySelector('.loc-lng')?.value);
-        return {
-          id: row.querySelector('.loc-id').value,
-          name: row.querySelector('.loc-name').value.trim(),
-          address: row.querySelector('.loc-address').value.trim(),
-          contact: row.querySelector('.loc-contact').value.trim(),
-          phone: row.querySelector('.loc-phone').value.trim(),
-          lat: !isNaN(latVal) ? latVal : null,
-          lng: !isNaN(lngVal) ? lngVal : null
-        };
-      });
+      const rows = Array.from(document.querySelectorAll('.client-loc-row'));
+      const locations = rows.map(r => ({
+        id: r.dataset.locId,
+        name: r.querySelector('.loc-name').value.trim(),
+        address: r.querySelector('.loc-address').value.trim(),
+        contact: r.querySelector('.loc-contact').value.trim(),
+        phone: r.querySelector('.loc-phone').value.trim(),
+        lat: r.dataset.lat ? parseFloat(r.dataset.lat) : null,
+        lng: r.dataset.lng ? parseFloat(r.dataset.lng) : null
+      })).filter(l => l.name && l.address);
+
       const payload = {
         name: document.getElementById('client-name').value.trim(),
         industry: document.getElementById('client-industry').value.trim(),
@@ -3864,7 +3829,7 @@
     }
 
     function confirmDeleteClient() {
-      appState.clients = appState.clients.filter(c => c.id !== deleteClientTargetId);
+      appState.clients = appState.clients.filter(x => x.id !== deleteClientTargetId);
       saveState();
       closeModal('modal-delete-client-confirm');
       updateClientFilterDatalists();
@@ -3876,345 +3841,170 @@
       const container = document.getElementById('global-bitacora-list');
       if (!container) return;
       const q = (document.getElementById('filter-bitacora')?.value || '').trim().toLowerCase();
-      const allLogs = [];
+      const entries = [];
       (appState.machines || []).forEach(m => {
-        (m.logs || []).forEach(l => {
-          allLogs.push({ ...l, machineId: m.id, machineCode: m.code, machineModel: `${m.brand} ${m.model}` });
-        });
+        (m.logs || []).forEach(l => entries.push({ machine: m, log: l }));
       });
-      allLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
-      const filtered = q ? allLogs.filter(l => `${l.machineCode} ${l.tech} ${l.locationText} ${l.notes} ${l.type}`.toLowerCase().includes(q)) : allLogs;
+      entries.sort((a, b) => new Date(b.log.date) - new Date(a.log.date));
+      const filtered = entries.filter(({ machine, log }) => {
+        if (!q) return true;
+        return `${machine.code} ${machine.brand} ${log.tech} ${log.type} ${log.locationText} ${log.notes}`.toLowerCase().includes(q);
+      });
 
       if (filtered.length === 0) {
         container.innerHTML = `<div class="bg-white rounded-2xl p-8 text-center border border-[#dfe6f5] text-xs text-slate-500">No hay registros en la bitácora global.</div>`;
         return;
       }
 
-      container.innerHTML = filtered.map(l => `
+      container.innerHTML = filtered.map(({ machine, log }) => `
         <div class="bg-white rounded-2xl p-4 border border-[#dfe6f5] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="space-y-1">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="px-2 py-0.5 rounded bg-[#243360] text-[#F2B705] font-black text-[11px]">${escapeHtml(l.machineCode)}</span>
-              <span class="font-extrabold text-xs text-[#243360]">${escapeHtml(l.type)}</span>
-              <span class="text-[11px] font-mono text-slate-400">${escapeHtml((l.date || '').replace('T', ' '))}</span>
+              <span class="px-2 py-0.5 rounded bg-[#243360] text-[#F2B705] text-[11px] font-black">${escapeHtml(machine.code)}</span>
+              <span class="font-extrabold text-xs text-[#243360]">${escapeHtml(log.type)}</span>
+              <span class="text-[11px] font-mono text-slate-400">${escapeHtml((log.date || '').replace('T', ' '))}</span>
             </div>
-            <p class="text-xs font-bold text-slate-600">${escapeHtml(l.tech)} • ${escapeHtml(l.locationText)}</p>
-            <p class="text-xs text-slate-700">${escapeHtml(l.notes)}</p>
+            <p class="text-xs font-bold text-slate-600"><i class="fa-solid fa-user-gear text-[#dca500] mr-1"></i>${escapeHtml(log.tech)} • ${escapeHtml(log.locationText || '')}</p>
+            <p class="text-xs text-slate-700">${escapeHtml(log.notes)}</p>
           </div>
-          <button type="button" onclick="openLifecycleModal('${escapeHtml(l.machineId)}')" class="px-3.5 py-2 rounded-xl bg-[#f1f4fa] hover:bg-[#dfe6f5] text-[#243360] text-xs font-extrabold shrink-0">
+          <button type="button" onclick="openLifecycleModal('${escapeHtml(machine.id)}')" class="px-3.5 py-2 rounded-xl bg-[#f1f4fa] hover:bg-[#dfe6f5] text-[#243360] font-extrabold text-xs shrink-0">
             Ver Máquina &rarr;
           </button>
         </div>`).join('');
     }
 
     // =========================================================================
-    // 9. CONFIGURACIÓN, QR ETIQUETAS, ESCÁNER Y EXPORTACIÓN
+    // 9. CONFIGURACIÓN, QR Y EXPORTACIÓN
     // =========================================================================
     function openConfigModal() {
       if (!isManager()) return;
       populateAllWarehouseSelects();
       renderConfigWarehousesAndUsers();
-      const url = window.location.href.split('?')[0];
-      document.getElementById('app-share-url-input').value = url;
+      const shareUrl = window.location.href.split('?')[0];
+      document.getElementById('app-share-url-input').value = shareUrl;
       const qrBox = document.getElementById('app-share-qr-box');
       qrBox.innerHTML = '';
-      if (typeof QRCode !== 'undefined') {
-        new QRCode(qrBox, { text: url, width: 110, height: 110, colorDark: '#243360', colorLight: '#ffffff' });
-      }
+      if (window.QRCode) new QRCode(qrBox, { text: shareUrl, width: 110, height: 110 });
       document.getElementById('modal-config').classList.remove('hidden');
     }
 
     function renderConfigWarehousesAndUsers() {
       document.getElementById('config-warehouses-list').innerHTML = (appState.warehouses || []).map(w => `
-        <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-[#243360]">
+        <div class="flex items-center justify-between px-3 py-2 bg-[#f8fafe] rounded-xl border border-[#dfe6f5] text-xs font-bold text-[#243360]">
           <span>Bodega ${escapeHtml(w)}</span>
-          <div class="flex items-center gap-1">
-            <button type="button" onclick="editWarehouseConfig('${escapeHtml(w)}')" title="Editar nombre de bodega" class="px-2 py-1 rounded bg-[#f1f4fa] hover:bg-[#dfe6f5] text-[#243360] font-bold"><i class="fa-solid fa-pen"></i></button>
-            <button type="button" onclick="deleteWarehouseConfig('${escapeHtml(w)}')" title="Eliminar bodega" class="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold"><i class="fa-solid fa-trash"></i></button>
-          </div>
+          <button type="button" onclick="deleteWarehouseConfig('${escapeHtml(w)}')" class="text-rose-600"><i class="fa-solid fa-trash"></i></button>
         </div>`).join('');
 
       document.getElementById('config-users-list').innerHTML = (appState.users || []).map(u => `
-        <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs">
+        <div class="flex items-center justify-between px-3 py-2 bg-[#f8fafe] rounded-xl border border-[#dfe6f5] text-xs">
           <div>
             <p class="font-extrabold text-[#243360]">${escapeHtml(u.name)}</p>
-            <p class="text-[10px] text-slate-500">${u.role === 'gerencia' ? '👑 Gerencia' : '🛠️ Técnico (' + escapeHtml(u.warehouse) + ')'} • Clave: <strong>${escapeHtml(u.password)}</strong></p>
+            <p class="text-[10px] text-slate-500">${u.role === 'gerencia' ? '👑 Gerencia' : '🛠️ Técnico • ' + escapeHtml(u.warehouse)}</p>
           </div>
-          <div class="flex items-center gap-1">
-            <button type="button" onclick="editUserConfig('${escapeHtml(u.id)}')" title="Editar usuario" class="px-2 py-1 rounded bg-[#f1f4fa] hover:bg-[#dfe6f5] text-[#243360] font-bold"><i class="fa-solid fa-pen"></i></button>
-            <button type="button" onclick="deleteUserConfig('${escapeHtml(u.id)}')" title="Eliminar usuario" class="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold"><i class="fa-solid fa-trash"></i></button>
-          </div>
+          <button type="button" onclick="deleteUserConfig('${escapeHtml(u.id)}')" class="text-rose-600"><i class="fa-solid fa-trash"></i></button>
         </div>`).join('');
     }
 
-    function editWarehouseConfig(whName) {
-      document.getElementById('config-edit-warehouse-original').value = whName;
-      document.getElementById('config-new-warehouse').value = whName;
-      document.getElementById('config-warehouse-form-label').textContent = 'Editar Bodega:';
-      document.getElementById('btn-submit-warehouse-config').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> <span>Guardar</span>';
-      document.getElementById('btn-cancel-edit-warehouse').classList.remove('hidden');
-      document.getElementById('config-new-warehouse').focus();
-    }
-
-    function cancelEditWarehouseConfig() {
-      document.getElementById('config-edit-warehouse-original').value = '';
-      document.getElementById('config-new-warehouse').value = '';
-      document.getElementById('config-warehouse-form-label').textContent = 'Nueva Bodega:';
-      document.getElementById('btn-submit-warehouse-config').innerHTML = '<i class="fa-solid fa-plus"></i> <span>Agregar</span>';
-      document.getElementById('btn-cancel-edit-warehouse').classList.add('hidden');
-    }
-
     function saveWarehouseFromConfig(e) {
       e.preventDefault();
       const name = document.getElementById('config-new-warehouse').value.trim();
-      const original = document.getElementById('config-edit-warehouse-original').value.trim();
-      if (!name) return;
-
-      if (original) {
-        if (name !== original && appState.warehouses.includes(name)) {
-          showToast('Ya existe una bodega con ese nombre.', 'error');
-          return;
-        }
-        const idx = appState.warehouses.indexOf(original);
-        if (idx !== -1) appState.warehouses[idx] = name;
-        (appState.machines || []).forEach(m => { if (m.warehouse === original) m.warehouse = name; });
-        (appState.parts || []).forEach(p => { if (p.warehouse === original) p.warehouse = name; });
-        (appState.users || []).forEach(u => { if (u.warehouse === original) u.warehouse = name; });
-        if (currentSession && currentSession.warehouse === original) currentSession.warehouse = name;
-        saveState();
-        cancelEditWarehouseConfig();
-        populateAllWarehouseSelects();
-        renderConfigWarehousesAndUsers();
-        renderMachines();
-        renderParts();
-        showToast('Bodega actualizada correctamente.');
-        return;
-      }
-
-      if (!appState.warehouses.includes(name)) {
-        appState.warehouses.push(name);
-        saveState();
-        populateAllWarehouseSelects();
-        renderConfigWarehousesAndUsers();
-        showToast('Bodega agregada.');
-      } else {
-        showToast('Esa bodega ya existe.', 'error');
-      }
+      if (!name || appState.warehouses.includes(name)) return;
+      appState.warehouses.push(name);
       document.getElementById('config-new-warehouse').value = '';
-    }
-
-    function deleteWarehouseConfig(whName) {
-      if ((appState.warehouses || []).length <= 1) {
-        showToast('Debe existir al menos una bodega en el sistema.', 'error');
-        return;
-      }
-      const fallbackWh = appState.warehouses.find(w => w !== whName);
-      appState.warehouses = appState.warehouses.filter(w => w !== whName);
-      (appState.machines || []).forEach(m => { if (m.warehouse === whName) m.warehouse = fallbackWh; });
-      (appState.parts || []).forEach(p => { if (p.warehouse === whName) p.warehouse = fallbackWh; });
-      (appState.users || []).forEach(u => { if (u.warehouse === whName) u.warehouse = fallbackWh; });
       saveState();
       populateAllWarehouseSelects();
       renderConfigWarehousesAndUsers();
-      renderMachines();
-      renderParts();
-      showToast(`Bodega "${whName}" eliminada (elementos reasignados a ${fallbackWh}).`);
+      showToast('Bodega agregada.');
+    }
+
+    function deleteWarehouseConfig(w) {
+      if (appState.warehouses.length <= 1) return;
+      appState.warehouses = appState.warehouses.filter(x => x !== w);
+      saveState();
+      populateAllWarehouseSelects();
+      renderConfigWarehousesAndUsers();
     }
 
     function toggleConfigUserWarehouse() {
-      const r = document.getElementById('config-user-role').value;
-      document.getElementById('config-user-warehouse-box').classList.toggle('hidden', r === 'gerencia');
-    }
-
-    function editUserConfig(uid) {
-      const u = appState.users.find(x => x.id === uid);
-      if (!u) return;
-      document.getElementById('config-edit-user-id').value = u.id;
-      document.getElementById('config-user-name').value = u.name;
-      document.getElementById('config-user-password').value = u.password;
-      document.getElementById('config-user-role').value = u.role;
-      document.getElementById('config-user-warehouse').value = u.warehouse || (appState.warehouses[0] || 'Chillán');
-      toggleConfigUserWarehouse();
-      document.getElementById('config-user-form-label').textContent = 'Editando Usuario:';
-      document.getElementById('btn-submit-user-config').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> <span>Guardar Cambios</span>';
-      document.getElementById('btn-cancel-edit-user').classList.remove('hidden');
-      document.getElementById('config-user-name').focus();
-    }
-
-    function cancelEditUserConfig() {
-      document.getElementById('config-edit-user-id').value = '';
-      document.getElementById('config-user-name').value = '';
-      document.getElementById('config-user-password').value = '';
-      document.getElementById('config-user-form-label').textContent = 'Nuevo Usuario';
-      document.getElementById('btn-submit-user-config').innerHTML = '<i class="fa-solid fa-user-plus"></i> <span>Agregar Usuario</span>';
-      document.getElementById('btn-cancel-edit-user').classList.add('hidden');
+      const role = document.getElementById('config-user-role').value;
+      document.getElementById('config-user-warehouse-box').classList.toggle('hidden', role === 'gerencia');
     }
 
     function saveUserFromConfig(e) {
       e.preventDefault();
-      const uid = document.getElementById('config-edit-user-id').value;
-      const payload = {
-        name: document.getElementById('config-user-name').value.trim(),
-        password: document.getElementById('config-user-password').value.trim(),
-        role: document.getElementById('config-user-role').value,
-        warehouse: document.getElementById('config-user-warehouse').value
-      };
-      if (uid) {
-        const u = appState.users.find(x => x.id === uid);
-        if (u) Object.assign(u, payload);
-        if (currentSession && currentSession.id === uid) {
-          currentSession.name = payload.name;
-          currentSession.role = payload.role;
-          currentSession.warehouse = payload.warehouse;
-          applyRolePermissionsToUI();
-        }
-      } else {
-        appState.users.push({ id: 'usr-' + Date.now(), ...payload });
-      }
+      const name = document.getElementById('config-user-name').value.trim();
+      const password = document.getElementById('config-user-password').value.trim();
+      const role = document.getElementById('config-user-role').value;
+      const warehouse = document.getElementById('config-user-warehouse').value;
+      appState.users.push({ id: 'usr-' + Date.now(), name, password, role, warehouse });
+      document.getElementById('config-user-name').value = '';
+      document.getElementById('config-user-password').value = '';
       saveState();
-      cancelEditUserConfig();
       renderConfigWarehousesAndUsers();
-      showToast('Usuario guardado correctamente.');
+      showToast('Usuario creado.');
     }
 
     function deleteUserConfig(uid) {
-      if ((appState.users || []).length <= 1) {
-        showToast('Debe quedar al menos un usuario registrado en el sistema.', 'error');
-        return;
-      }
-      const target = appState.users.find(u => u.id === uid);
-      if (!target) return;
-      if (target.role === 'gerencia') {
-        const managersCount = appState.users.filter(u => u.role === 'gerencia').length;
-        if (managersCount <= 1) {
-          showToast('No puedes eliminar el único usuario de Gerencia.', 'error');
-          return;
-        }
-      }
+      if (appState.users.length <= 1) return;
       appState.users = appState.users.filter(u => u.id !== uid);
       saveState();
       renderConfigWarehousesAndUsers();
-      showToast(`Usuario "${target.name}" eliminado.`);
-    }
-
-    function saveWarehouseFromConfig(e) {
-      e.preventDefault();
-      const name = document.getElementById('config-new-warehouse').value.trim();
-      if (!name) return;
-      if (!appState.warehouses.includes(name)) {
-        appState.warehouses.push(name);
-        saveState();
-        populateAllWarehouseSelects();
-        renderConfigWarehousesAndUsers();
-        showToast('Bodega agregada.');
-      }
-      document.getElementById('config-new-warehouse').value = '';
     }
 
     function cancelEditWarehouseConfig() {}
-
-    function toggleConfigUserWarehouse() {
-      const r = document.getElementById('config-user-role').value;
-      document.getElementById('config-user-warehouse-box').classList.toggle('hidden', r === 'gerencia');
-    }
-
-    function editUserConfig(uid) {
-      const u = appState.users.find(x => x.id === uid);
-      if (!u) return;
-      document.getElementById('config-edit-user-id').value = u.id;
-      document.getElementById('config-user-name').value = u.name;
-      document.getElementById('config-user-password').value = u.password;
-      document.getElementById('config-user-role').value = u.role;
-      document.getElementById('config-user-warehouse').value = u.warehouse || 'Chillán';
-      toggleConfigUserWarehouse();
-      document.getElementById('btn-cancel-edit-user').classList.remove('hidden');
-    }
-
-    function cancelEditUserConfig() {
-      document.getElementById('config-edit-user-id').value = '';
-      document.getElementById('config-user-name').value = '';
-      document.getElementById('config-user-password').value = '';
-      document.getElementById('btn-cancel-edit-user').classList.add('hidden');
-    }
-
-    function saveUserFromConfig(e) {
-      e.preventDefault();
-      const uid = document.getElementById('config-edit-user-id').value;
-      const payload = {
-        name: document.getElementById('config-user-name').value.trim(),
-        password: document.getElementById('config-user-password').value.trim(),
-        role: document.getElementById('config-user-role').value,
-        warehouse: document.getElementById('config-user-warehouse').value
-      };
-      if (uid) {
-        const u = appState.users.find(x => x.id === uid);
-        if (u) Object.assign(u, payload);
-      } else {
-        appState.users.push({ id: 'usr-' + Date.now(), ...payload });
-      }
-      saveState();
-      cancelEditUserConfig();
-      renderConfigWarehousesAndUsers();
-      showToast('Usuario guardado.');
-    }
-
-    function copyTextFallback(text) {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-      showToast('Enlace copiado al portapapeles.');
-    }
+    function cancelEditUserConfig() {}
 
     function copyAppShareUrl() {
-      copyTextFallback(document.getElementById('app-share-url-input').value);
+      const inp = document.getElementById('app-share-url-input');
+      inp.select();
+      navigator.clipboard?.writeText(inp.value);
+      showToast('Enlace copiado.');
     }
 
     function openMobileShareModal() {
       const url = window.location.href.split('?')[0];
       document.getElementById('mobile-modal-url-input').value = url;
-      document.getElementById('mobile-modal-whatsapp-btn').href = `https://wa.me/?text=${encodeURIComponent('Acceso App LYKOS Vending Machines: ' + url)}`;
+      document.getElementById('mobile-modal-whatsapp-btn').href = `https://wa.me/?text=${encodeURIComponent('Acceso Sistema LYKOS Vending: ' + url)}`;
       const box = document.getElementById('mobile-modal-qr-box');
       box.innerHTML = '';
-      if (typeof QRCode !== 'undefined') {
-        new QRCode(box, { text: url, width: 120, height: 120, colorDark: '#243360', colorLight: '#ffffff' });
-      }
+      if (window.QRCode) new QRCode(box, { text: url, width: 120, height: 120 });
       document.getElementById('modal-mobile-share').classList.remove('hidden');
     }
 
     function copyMobileModalUrl() {
-      copyTextFallback(document.getElementById('mobile-modal-url-input').value);
+      const inp = document.getElementById('mobile-modal-url-input');
+      inp.select();
+      navigator.clipboard?.writeText(inp.value);
+      showToast('Enlace copiado al portapapeles.');
     }
 
     function openMachineQrModal(machineId) {
       const m = appState.machines.find(x => x.id === machineId);
       if (!m) return;
-      const baseUrl = window.location.href.split('?')[0];
-      const qrUrl = `${baseUrl}?machine=${encodeURIComponent(m.code)}`;
+      const url = `${window.location.href.split('?')[0]}?machine=${encodeURIComponent(m.code)}`;
       document.getElementById('qr-card-type').textContent = m.type.toUpperCase();
       document.getElementById('qr-card-code').textContent = m.code;
       document.getElementById('qr-card-model').textContent = `${m.brand} ${m.model}`;
-      document.getElementById('qr-card-serial').textContent = `Serie: ${m.serial}`;
-      document.getElementById('qr-direct-url-input').value = qrUrl;
+      document.getElementById('qr-card-serial').textContent = `S/N: ${m.serial}`;
+      document.getElementById('qr-direct-url-input').value = url;
       const box = document.getElementById('qr-canvas-container');
       box.innerHTML = '';
-      if (typeof QRCode !== 'undefined') {
-        new QRCode(box, { text: qrUrl, width: 150, height: 150, colorDark: '#243360', colorLight: '#ffffff' });
-      }
+      if (window.QRCode) new QRCode(box, { text: url, width: 150, height: 150 });
       document.getElementById('modal-machine-qr').classList.remove('hidden');
     }
 
     function copyMachineQrUrl() {
-      copyTextFallback(document.getElementById('qr-direct-url-input').value);
+      const inp = document.getElementById('qr-direct-url-input');
+      inp.select();
+      navigator.clipboard?.writeText(inp.value);
+      showToast('Enlace de máquina copiado.');
     }
 
     function downloadMachineQrPng() {
       const canvas = document.querySelector('#qr-canvas-container canvas');
       if (!canvas) return;
       const a = document.createElement('a');
-      a.download = `QR_${document.getElementById('qr-card-code').textContent}.png`;
+      a.download = `QR-${document.getElementById('qr-card-code').textContent}.png`;
       a.href = canvas.toDataURL('image/png');
       a.click();
     }
@@ -4225,28 +4015,21 @@
 
     function openQrScannerModal() {
       document.getElementById('modal-qr-scanner').classList.remove('hidden');
-      const status = document.getElementById('qr-scanner-status');
-      if (typeof Html5Qrcode === 'undefined') {
-        status.textContent = 'Escáner de cámara no disponible en este navegador. Usa la búsqueda manual abajo.';
-        return;
-      }
-      try {
-        html5QrScanner = new Html5Qrcode('qr-reader-region');
-        html5QrScanner.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 200, height: 200 } },
-          (decodedText) => {
-            closeQrScannerModal();
-            openMachineByScannedCode(decodedText);
-          },
-          () => {}
-        ).then(() => {
-          status.textContent = 'Cámara activa: enfoca el código QR.';
-        }).catch(() => {
-          status.textContent = 'No se pudo acceder a la cámara. Ingresa el código manualmente abajo.';
-        });
-      } catch (e) {
-        status.textContent = 'Ingresa el código de la máquina manualmente abajo.';
+      document.getElementById('qr-scanner-status').textContent = 'Apunta la cámara al código QR o ingresa el código abajo.';
+      if (window.Html5Qrcode) {
+        try {
+          html5QrScanner = new Html5Qrcode('qr-reader-region');
+          html5QrScanner.start(
+            { facingMode: 'environment' },
+            { fps: 10, qrbox: { width: 220, height: 220 } },
+            decodedText => {
+              closeQrScannerModal();
+              openMachineByScannedCode(decodedText);
+            }
+          ).catch(() => {
+            document.getElementById('qr-scanner-status').textContent = 'Cámara no disponible. Ingresa el código manualmente.';
+          });
+        } catch (e) {}
       }
     }
 
@@ -4262,15 +4045,14 @@
       if (!raw) return;
       let code = raw.trim();
       if (code.includes('machine=')) {
-        try {
-          code = decodeURIComponent(code.split('machine=')[1].split('&')[0]);
-        } catch (e) {}
+        try { code = new URL(code).searchParams.get('machine') || code; } catch (e) {}
       }
       const m = appState.machines.find(x => x.code.toLowerCase() === code.toLowerCase() || x.serial.toLowerCase() === code.toLowerCase());
       if (m) {
+        closeModal('modal-qr-scanner');
         openLifecycleModal(m.id);
       } else {
-        showToast(`No se encontró ninguna máquina con código "${code}".`, 'error');
+        showToast(`No se encontró máquina con código "${code}".`, 'error');
       }
     }
 
@@ -4278,265 +4060,103 @@
       const blob = new Blob([JSON.stringify(appState, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `LYKOS_Respaldo_${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `LYKOS_Respaldo_${getChileTodayDateStr(0)}.json`;
       a.click();
       showToast('Respaldo JSON descargado.');
     }
 
     function resetDemoData() {
+      if (!confirm('¿Restaurar los datos de demostración iniciales?')) return;
       appState = buildDefaultState();
       saveState();
+      populateAllWarehouseSelects();
       renderMachines();
       renderParts();
       renderClients();
-      showToast('Datos de demostración restaurados.');
+      showToast('Datos de ejemplo restaurados.');
     }
-
-    // Detectar parámetro ?machine= en la URL para abrir ficha tras iniciar sesión
-    try {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('machine')) pendingDeepLinkMachineCode = params.get('machine');
-    } catch (e) {}
 
     // =========================================================================
-    // 10. CONTROL DE ACCESO ESTRICTO CON USUARIO Y CLAVE
+    // 10. AUTENTICACIÓN Y ARRANQUE DEL SISTEMA
     // =========================================================================
-    function openAuthScreen() {
-      currentSession = null;
-      try {
-        localStorage.removeItem(SESSION_KEY);
-        sessionStorage.removeItem(SESSION_KEY);
-      } catch (e) {}
-      const userInp = document.getElementById('login-username');
-      const passInp = document.getElementById('login-password');
+    function handleUnifiedLoginSubmit(e) {
+      if (e) e.preventDefault();
+      const userInp = (document.getElementById('login-username')?.value || '').trim();
+      const passInp = (document.getElementById('login-password')?.value || '').trim();
       const errBox = document.getElementById('login-error-box');
-      if (userInp) userInp.value = '';
-      if (passInp) passInp.value = '';
-      if (errBox) errBox.classList.add('hidden');
-      const shellEl = document.getElementById('protected-app-shell');
-      if (shellEl) {
-        shellEl.style.display = 'none';
-        shellEl.classList.add('hidden');
-      }
-      const authEl = document.getElementById('auth-screen');
-      if (authEl) {
-        authEl.style.display = 'flex';
-        authEl.classList.remove('hidden');
-      }
-    }
 
-    function showLoginError(msg) {
-      const errBox = document.getElementById('login-error-box');
-      const errTxt = document.getElementById('login-error-text');
-      if (errTxt) errTxt.textContent = msg;
-      if (errBox) errBox.classList.remove('hidden');
-      showToast(msg, 'error');
-    }
-
-    function normalizeLoginText(str) {
-      return String(str || '')
-        .trim()
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '');
-    }
-
-    function handleUnifiedLoginSubmit(event) {
-      if (event && typeof event.preventDefault === 'function') {
-        event.preventDefault();
-      }
-      const errBox = document.getElementById('login-error-box');
-      if (errBox) errBox.classList.add('hidden');
-
-      const usernameEl = document.getElementById('login-username');
-      const passwordEl = document.getElementById('login-password');
-      const username = usernameEl ? usernameEl.value.trim() : '';
-      const password = passwordEl ? passwordEl.value.trim() : '';
-      if (!username || !password) {
-        showLoginError('Debes ingresar usuario y clave de acceso.');
-        return false;
-      }
-
-      const normInput = normalizeLoginText(username);
-      const storedUsers = Array.isArray(appState.users) ? appState.users : [];
-      const usersPool = [...storedUsers];
-      DEFAULT_USERS.forEach(defU => {
-        if (!usersPool.some(u => normalizeLoginText(u.name) === normalizeLoginText(defU.name))) {
-          usersPool.push(defU);
-        }
-      });
-
-      const userMatch = usersPool.find(
-        u => normalizeLoginText(u.name) === normInput && String(u.password || '').trim() === password
+      const found = (appState.users || DEFAULT_USERS).find(
+        u => u.name.toLowerCase() === userInp.toLowerCase() && u.password === passInp
       );
 
-      if (!userMatch) {
-        showLoginError('Usuario o clave incorrectos. Usa: Gerencia Operaciones (clave: 123).');
+      if (!found) {
+        if (errBox) errBox.classList.remove('hidden');
         return false;
       }
 
-      currentSession = {
-        id: userMatch.id,
-        name: userMatch.name,
-        role: userMatch.role,
-        warehouse: userMatch.warehouse || (appState.warehouses?.[0] || 'Chillán')
-      };
-      const authEl = document.getElementById('auth-screen');
-      if (authEl) {
-        authEl.style.display = 'none';
-        authEl.classList.add('hidden');
-      }
-      const shellEl = document.getElementById('protected-app-shell');
-      if (shellEl) {
-        shellEl.style.display = 'block';
-        shellEl.classList.remove('hidden');
-      }
+      if (errBox) errBox.classList.add('hidden');
+      currentSession = { id: found.id, name: found.name, role: found.role, warehouse: found.warehouse };
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(currentSession)); } catch (err) {}
+
+      document.getElementById('auth-screen').style.display = 'none';
+      const shell = document.getElementById('protected-app-shell');
+      shell.classList.remove('hidden');
+      shell.style.display = 'block';
+
       applyRolePermissionsToUI();
       renderMachines();
       renderParts();
-      if (typeof renderClients === 'function') renderClients();
-      showToast(`Bienvenido, ${currentSession.name} (${isManager() ? 'Gerencia' : 'Técnico'}).`);
+      renderClients();
+      renderGlobalBitacora();
 
       if (pendingDeepLinkMachineCode) {
-        const code = pendingDeepLinkMachineCode;
+        const target = pendingDeepLinkMachineCode;
         pendingDeepLinkMachineCode = null;
-        openMachineByScannedCode(code);
+        openMachineByScannedCode(target);
       }
       return false;
     }
 
-    openAuthScreen();
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        openAuthScreen();
-      });
-    } else {
-      openAuthScreen();
+    function openAuthScreen() {
+      currentSession = null;
+      try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+      document.getElementById('protected-app-shell').style.display = 'none';
+      document.getElementById('auth-screen').style.display = 'flex';
+      document.getElementById('login-password').value = '';
     }
 
-    window.addEventListener('pageshow', () => {
-      if (!currentSession) {
-        openAuthScreen();
+    (function initApp() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('machine')) pendingDeepLinkMachineCode = params.get('machine');
+
+      const dl = document.getElementById('all-users-presets');
+      if (dl) {
+        dl.innerHTML = (appState.users || DEFAULT_USERS)
+          .map(u => `<option value="${escapeHtml(u.name)}"></option>`)
+          .join('');
       }
-    });
-
-    // Guardia de seguridad permanente: si no hay sesión iniciada con clave, mantiene el bloqueo activo
-    setInterval(() => {
-      if (!currentSession) {
-        const shellEl = document.getElementById('protected-app-shell');
-        const authEl = document.getElementById('auth-screen');
-        if (shellEl && shellEl.style.display !== 'none') {
-          shellEl.style.display = 'none';
-          shellEl.classList.add('hidden');
-        }
-        if (authEl && authEl.style.display !== 'flex') {
-          authEl.style.display = 'flex';
-          authEl.classList.remove('hidden');
-        }
-      }
-    }, 300);
-  </script>
-
-  <!-- ========================================================================= -->
-  <!-- 12. SINCRONIZACIÓN MULTI-DISPOSITIVO EN TIEMPO REAL (NUBE COMPARTIDA)     -->
-  <!-- ========================================================================= -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    async function initRealtimeCloudSync() {
-      const bridge = window.lykosBridge;
-      if (!bridge) return;
-
-      const defaultFirebaseConfig = {
-        apiKey: "AIzaSyDdyRXT2rJbfqxwy5z68SsmxfZpmT5Vmp0",
-        authDomain: "lykos-maquinas.firebaseapp.com",
-        projectId: "lykos-maquinas",
-        storageBucket: "lykos-maquinas.firebasestorage.app",
-        messagingSenderId: "262454560769",
-        appId: "1:262454560769:web:47fe09b0e3fa7d4ac31800",
-        measurementId: "G-2JHC2BVEMV"
-      };
 
       try {
-        const firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config)
-          ? JSON.parse(__firebase_config)
-          : defaultFirebaseConfig;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'lykos-vending-shared';
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-
-        const user = auth.currentUser;
-        if (!user) {
-          bridge.setSyncStatus('local', 'Sin Auth');
-          return;
-        }
-
-        // Ruta pública compartida para que todos los celulares y PCs vean la misma información en vivo
-        const sharedDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'lykos_shared_state', 'main');
-        let initialSnapshotHandled = false;
-
-        const pushToCloud = async (stateSnapshot) => {
-          if (!auth.currentUser) return;
-          try {
-            await setDoc(sharedDocRef, {
-              payload: JSON.stringify(stateSnapshot),
-              updatedAt: new Date().toISOString()
-            });
-            bridge.setSyncStatus('live', 'En vivo');
-          } catch (err) {
-            console.warn('Error sincronizando hacia la nube:', err);
-            const code = err?.code || 'error';
-            bridge.setSyncStatus('local', `Error (${code})`);
+        const savedSess = sessionStorage.getItem(SESSION_KEY);
+        if (savedSess) {
+          currentSession = JSON.parse(savedSess);
+          document.getElementById('auth-screen').style.display = 'none';
+          const shell = document.getElementById('protected-app-shell');
+          shell.classList.remove('hidden');
+          shell.style.display = 'block';
+          applyRolePermissionsToUI();
+          renderMachines();
+          renderParts();
+          renderClients();
+          renderGlobalBitacora();
+          if (pendingDeepLinkMachineCode) {
+            const target = pendingDeepLinkMachineCode;
+            pendingDeepLinkMachineCode = null;
+            openMachineByScannedCode(target);
           }
-        };
-
-        bridge.setPushHandler(pushToCloud);
-
-        onSnapshot(
-          sharedDocRef,
-          (snap) => {
-            if (snap.exists()) {
-              const data = snap.data();
-              if (data && data.payload) {
-                try {
-                  const parsed = JSON.parse(data.payload);
-                  bridge.applyRemoteState(parsed);
-                } catch (parseErr) {
-                  console.warn('Error leyendo datos remotos:', parseErr);
-                }
-              }
-            } else if (!initialSnapshotHandled) {
-              // Primer dispositivo en conectarse inicializa el estado compartido
-              pushToCloud(bridge.getAppState());
-            }
-            initialSnapshotHandled = true;
-            bridge.setSyncStatus('live', 'En vivo');
-            bridge.onCloudReady();
-          },
-          (error) => {
-            console.warn('Error en suscripción en tiempo real:', error);
-            const code = error?.code || 'permisos';
-            bridge.setSyncStatus('local', `Error (${code})`);
-          }
-        );
-      } catch (e) {
-        console.warn('No se pudo iniciar sincronización en vivo:', e);
-        const code = e?.code || 'conexión';
-        bridge.setSyncStatus('local', `Error (${code})`);
-      }
-    }
-
-    initRealtimeCloudSync();
+        }
+      } catch (e) {}
+    })();
   </script>
 </body>
 </html>
