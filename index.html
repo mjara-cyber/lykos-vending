@@ -4219,7 +4219,7 @@
 
         const user = auth.currentUser;
         if (!user) {
-          bridge.setSyncStatus('local', 'Local');
+          bridge.setSyncStatus('local', 'Sin Auth');
           return;
         }
 
@@ -4237,7 +4237,8 @@
             bridge.setSyncStatus('live', 'En vivo');
           } catch (err) {
             console.warn('Error sincronizando hacia la nube:', err);
-            bridge.setSyncStatus('local', 'Sin red');
+            const code = err?.code || 'error';
+            bridge.setSyncStatus('local', `Error (${code})`);
           }
         };
 
@@ -4266,12 +4267,14 @@
           },
           (error) => {
             console.warn('Error en suscripción en tiempo real:', error);
-            bridge.setSyncStatus('local', 'Local');
+            const code = error?.code || 'permisos';
+            bridge.setSyncStatus('local', `Error (${code})`);
           }
         );
       } catch (e) {
         console.warn('No se pudo iniciar sincronización en vivo:', e);
-        bridge.setSyncStatus('local', 'Local');
+        const code = e?.code || 'conexión';
+        bridge.setSyncStatus('local', `Error (${code})`);
       }
     }
 
