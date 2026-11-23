@@ -912,7 +912,13 @@
 
             <!-- Nuevo avance -->
             <div class="bg-[#f8fafe] p-3.5 rounded-xl border border-[#dfe6f5] space-y-3">
-              <label class="block text-[11px] font-extrabold text-[#243360] uppercase">Registrar Avance de Trabajo</label>
+              <div class="flex items-center justify-between gap-2">
+                <label class="block text-[11px] font-extrabold text-[#243360] uppercase">Registrar Avance de Trabajo</label>
+                <button type="button" onclick="saveWorkStepInPlace()" class="px-3.5 py-1.5 rounded-xl bg-[#243360] hover:bg-[#192447] text-[#F2B705] font-extrabold text-xs shadow-sm flex items-center gap-1.5 transition-all">
+                  <i class="fa-solid fa-floppy-disk"></i>
+                  <span>Guardar Avance</span>
+                </button>
+              </div>
               <textarea id="rev-work-notes" rows="2" placeholder="Describe las pruebas, limpieza, calibración o reparación realizada..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#F2B705] focus:outline-none"></textarea>
 
               <div class="space-y-1.5">
@@ -2716,6 +2722,11 @@
       document.getElementById('lc-address').innerHTML = `<i class="fa-solid fa-location-dot text-rose-500 mt-0.5"></i><span>${escapeHtml(info.address || 'Sin dirección registrada')}</span>`;
       document.getElementById('lc-waze-btn').href = buildWazeUrl(info.address, info.lat, info.lng);
 
+      const revBtnLabel = document.getElementById('lc-btn-revision-label');
+      if (revBtnLabel) {
+        revBtnLabel.textContent = m.activeRevision ? 'Continuar Revisión en Curso' : 'Revisión';
+      }
+
       applyRolePermissionsToUI();
       filterLifecycleTimeline();
       document.getElementById('modal-lifecycle').classList.remove('hidden');
@@ -2741,24 +2752,76 @@
       }
 
       container.innerHTML = logs.map(log => {
+        const hasSteps = Array.isArray(log.steps) && log.steps.length > 0;
+        const firstStep = hasSteps ? log.steps[0] : null;
+        const initialFaultText = firstStep
+          ? (firstStep.description || 'Inicio de revisión técnica.')
+          : (log.notes || '').split('|')[0].replace(/^Diagnóstico:\s*/i, '').trim() || log.notes;
+
         const partsHtml = (log.partsUsed && log.partsUsed.length)
-          ? `<div class="mt-2 flex flex-wrap gap-1.5">${log.partsUsed.map(p => `<span class="px-2 py-0.5 rounded-lg bg-[#fef8e6] border border-[#F2B705]/50 text-[11px] font-bold text-[#243360]"><i class="fa-solid fa-gears text-[#dca500] mr-1"></i>${escapeHtml(p.name)} x${p.qty}</span>`).join('')}</div>`
+          ? `<div class="mt-2.5 pt-2 border-t border-slate-100">
+              <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">Repuestos Instalados:</p>
+              <div class="flex flex-wrap gap-1.5">${log.partsUsed.map(p => `<span class="px-2 py-0.5 rounded-lg bg-[#fef8e6] border border-[#F2B705]/50 text-[11px] font-bold text-[#243360]"><i class="fa-solid fa-gears text-[#dca500] mr-1"></i>${escapeHtml(p.name)} x${p.qty}</span>`).join('')}</div>
+            </div>`
           : '';
-        const photosHtml = (log.photos && log.photos.length)
-          ? `<div class="mt-2.5 flex flex-wrap gap-2">${log.photos.map(ph => `<img src="${escapeHtml(ph.url || ph)}" onclick="openLightbox(this.src, '${escapeHtml(log.type)}')" class="w-16 h-16 rounded-xl object-cover border border-slate-300 cursor-pointer hover:scale-105 transition-transform" />`).join('')}</div>`
-          : '';
+
+        let detailContentHtml = '';
+
+        if (hasSteps) {
+          detailContentHtml = `
+            <div class="space-y-2 border-l-2 border-[#F2B705] pl-3">
+              ${log.steps.map((st, idx) => {
+                const stPhotos = Array.isArray(st.photos) ? st.photos : [];
+                const stPhotosHtml = stPhotos.length
+                  ? `<div class="mt-2 flex flex-wrap gap-2">${stPhotos.map(src => `
+                      <div class="relative group">
+                        <img src="${escapeHtml(src)}" onclick="openLightbox(this.src, '${escapeHtml(st.title || ('Paso ' + (idx + 1)))}')" class="w-20 h-20 rounded-xl object-cover border-2 border-[#dfe6f5] group-hover:border-[#F2B705] cursor-pointer transition-all shadow-xs" />
+                        <span class="absolute bottom-1 left-1 right-1 px-1 py-0.5 rounded bg-[#243360]/85 text-white text-[9px] font-bold text-center truncate">${escapeHtml(st.stage || ('Paso ' + (idx + 1)))}</span>
+                      </div>`).join('')}</div>`
+                  : '';
+                return `
+                  <div class="bg-[#f8fafe] rounded-xl p-2.5 border border-[#dfe6f5]">
+                    <div class="flex flex-wrap items-center justify-between gap-1 text-[10px]">
+                      <span class="font-extrabold text-[#243360] uppercase"><span class="inline-block px-1.5 py-0.5 rounded bg-[#243360] text-[#F2B705] mr-1">Paso ${idx + 1}</span>${escapeHtml(st.title || 'Etapa')}</span>
+                      <span class="font-mono text-slate-400">${escapeHtml(st.date || '')}${st.tech ? ' • ' + escapeHtml(st.tech) : ''}</span>
+                    </div>
+                    ${st.locationText ? `<p class="text-[10px] font-semibold text-slate-500 mt-0.5"><i class="fa-solid fa-location-dot text-rose-500 mr-1"></i>${escapeHtml(st.locationText)}</p>` : ''}
+                    <p class="text-xs text-slate-700 mt-1 leading-relaxed">${escapeHtml(st.description || '')}</p>
+                    ${stPhotosHtml}
+                  </div>`;
+              }).join('')}
+            </div>
+            ${partsHtml}`;
+        } else {
+          const photosHtml = (log.photos && log.photos.length)
+            ? `<div class="mt-2.5 flex flex-wrap gap-2">${log.photos.map(ph => {
+                const url = ph.url || ph;
+                const stage = ph.stage || 'Registro';
+                return `
+                  <div class="relative group">
+                    <img src="${escapeHtml(url)}" onclick="openLightbox(this.src, '${escapeHtml(log.type)} - ${escapeHtml(stage)}')" class="w-20 h-20 rounded-xl object-cover border border-slate-300 cursor-pointer hover:scale-105 transition-transform" />
+                    <span class="absolute bottom-1 left-1 right-1 px-1 py-0.5 rounded bg-[#243360]/85 text-white text-[9px] font-bold text-center truncate">${escapeHtml(stage)}</span>
+                  </div>`;
+              }).join('')}</div>`
+            : '';
+          detailContentHtml = `<p class="text-xs text-slate-700 leading-relaxed">${escapeHtml(log.notes)}</p>${photosHtml}${partsHtml}`;
+        }
+
         const adminBtns = isManager()
           ? `<div class="flex items-center gap-1.5">
               <button type="button" onclick="openEditLogModal('${escapeHtml(log.id)}')" class="px-2 py-1 rounded-lg bg-[#f1f4fa] hover:bg-[#dfe6f5] text-[#243360] text-[10px] font-extrabold"><i class="fa-solid fa-pen"></i></button>
               <button type="button" onclick="openDeleteLogModal('${escapeHtml(log.id)}')" class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] font-extrabold"><i class="fa-solid fa-trash"></i></button>
             </div>`
           : '';
+        const detailId = `log-detail-${escapeHtml(log.id)}`;
+        const iconId = `log-toggle-icon-${escapeHtml(log.id)}`;
+        const labelId = `log-toggle-label-${escapeHtml(log.id)}`;
         return `
         <div class="relative pl-10">
           <span class="absolute left-2.5 top-2 w-5 h-5 rounded-full bg-[#243360] text-[#F2B705] flex items-center justify-center text-[10px] ring-4 ring-white">
             <i class="fa-solid fa-wrench"></i>
           </span>
-          <div class="bg-white rounded-2xl p-4 border border-[#dfe6f5] shadow-sm space-y-1.5">
+          <div class="bg-white rounded-2xl p-4 border border-[#dfe6f5] shadow-sm space-y-2">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div class="flex items-center gap-2">
                 <span class="font-extrabold text-xs text-[#243360]">${escapeHtml(log.type)}</span>
@@ -2767,12 +2830,32 @@
               ${adminBtns}
             </div>
             <p class="text-[11px] font-bold text-slate-600"><i class="fa-solid fa-user-gear text-[#dca500] mr-1"></i>${escapeHtml(log.tech)} • <i class="fa-solid fa-location-dot text-rose-500 mx-1"></i>${escapeHtml(log.locationText || '')}</p>
-            <p class="text-xs text-slate-700 leading-relaxed">${escapeHtml(log.notes)}</p>
-            ${partsHtml}
-            ${photosHtml}
+            <div class="bg-[#f8fafe] px-3 py-2 rounded-xl border border-[#dfe6f5] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="text-xs text-slate-700">
+                <span class="font-extrabold text-[#243360]">Falla / Motivo Inicial:</span> ${escapeHtml(initialFaultText)}
+              </div>
+              <button type="button" onclick="toggleLifecycleLogDetails('${escapeHtml(log.id)}')" class="px-3 py-1.5 rounded-lg bg-[#243360] hover:bg-[#192447] text-[#F2B705] text-[11px] font-extrabold shrink-0 flex items-center gap-1.5 self-start sm:self-auto transition-colors">
+                <i id="${iconId}" class="fa-solid fa-chevron-down"></i>
+                <span id="${labelId}">Ver trabajo realizado</span>
+              </button>
+            </div>
+            <div id="${detailId}" class="hidden pt-2 border-t border-slate-100">
+              ${detailContentHtml}
+            </div>
           </div>
         </div>`;
       }).join('');
+    }
+
+    function toggleLifecycleLogDetails(logId) {
+      const box = document.getElementById(`log-detail-${logId}`);
+      const icon = document.getElementById(`log-toggle-icon-${logId}`);
+      const label = document.getElementById(`log-toggle-label-${logId}`);
+      if (!box) return;
+      const isHidden = box.classList.contains('hidden');
+      box.classList.toggle('hidden', !isHidden);
+      if (icon) icon.className = isHidden ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down';
+      if (label) label.textContent = isHidden ? 'Ocultar trabajo' : 'Ver trabajo realizado';
     }
 
     function clearLifecycleDateFilter() {
@@ -2782,37 +2865,11 @@
     }
 
     // Asistente de Revisión Técnica
-    function openNewLogModal() {
-      const m = appState.machines.find(x => x.id === currentMachineId);
-      if (!m) return;
-      revInitPhotoData = '';
-      revFinalPhotoData = '';
-      revWorkPhotosDraft = [];
-      revUsedPartsDraft = [];
-      revWorkStepsDraft = [];
-      revInitialDecision = 'onsite';
-      document.getElementById('rev-modal-title').innerHTML = `<i class="fa-solid fa-clipboard-check text-[#F2B705]"></i><span>Revisión Técnica — ${escapeHtml(m.code)}</span>`;
-      document.getElementById('rev-tech').value = currentSession ? currentSession.name : '';
-      populateAllWarehouseSelects();
-      if (currentSession?.warehouse) document.getElementById('rev-tech-warehouse').value = currentSession.warehouse;
-      document.getElementById('rev-init-desc').value = '';
-      document.getElementById('rev-init-photo-preview').innerHTML = '';
-      document.getElementById('rev-work-notes').value = '';
-      document.getElementById('rev-work-photos-preview').innerHTML = '';
-      document.getElementById('rev-work-history-list').innerHTML = '';
-      document.getElementById('rev-final-desc').value = '';
-      document.getElementById('rev-final-photo-preview').innerHTML = '';
-      selectInitialDecision('onsite');
-      populateLogPartsDropdown();
-      renderUsedPartsDraft();
-      switchRevisionStep('init');
-      document.getElementById('modal-new-log').classList.remove('hidden');
-    }
-
     function switchRevisionStep(step) {
       ['init', 'work', 'finish'].forEach(s => {
-        document.getElementById(`rev-step-${s}`).classList.toggle('hidden', s !== step);
+        const panel = document.getElementById(`rev-step-${s}`);
         const tab = document.getElementById(`rev-tab-${s}`);
+        if (panel) panel.classList.toggle('hidden', s !== step);
         if (tab) {
           tab.className = s === step
             ? 'px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 bg-[#243360] text-[#F2B705] shrink-0'
@@ -2821,20 +2878,22 @@
       });
     }
 
-    function selectInitialDecision(choice) {
-      revInitialDecision = choice;
-      const onsiteBtn = document.getElementById('rev-choice-onsite');
-      const wsBtn = document.getElementById('rev-choice-workshop');
+    function selectInitialDecision(decision) {
+      revInitialDecision = decision;
+      const btnOnsite = document.getElementById('rev-choice-onsite');
+      const btnWorkshop = document.getElementById('rev-choice-workshop');
       const wsBox = document.getElementById('rev-init-workshop-box');
-      if (choice === 'onsite') {
-        onsiteBtn.className = 'p-3 rounded-xl border-2 border-[#243360] bg-[#243360] text-white text-left transition-all shadow-sm';
-        wsBtn.className = 'p-3 rounded-xl border-2 border-slate-300 bg-white text-[#243360] hover:border-[#243360] text-left transition-all';
-        wsBox.classList.add('hidden');
-      } else {
-        wsBtn.className = 'p-3 rounded-xl border-2 border-[#243360] bg-[#243360] text-white text-left transition-all shadow-sm';
-        onsiteBtn.className = 'p-3 rounded-xl border-2 border-slate-300 bg-white text-[#243360] hover:border-[#243360] text-left transition-all';
-        wsBox.classList.remove('hidden');
+
+      if (btnOnsite && btnWorkshop) {
+        if (decision === 'onsite') {
+          btnOnsite.className = 'p-3 rounded-xl border-2 border-[#243360] bg-[#243360] text-white text-left transition-all shadow-sm';
+          btnWorkshop.className = 'p-3 rounded-xl border-2 border-slate-300 bg-white text-[#243360] hover:border-[#243360] text-left transition-all';
+        } else {
+          btnWorkshop.className = 'p-3 rounded-xl border-2 border-[#243360] bg-[#243360] text-white text-left transition-all shadow-sm';
+          btnOnsite.className = 'p-3 rounded-xl border-2 border-slate-300 bg-white text-[#243360] hover:border-[#243360] text-left transition-all';
+        }
       }
+      if (wsBox) wsBox.classList.toggle('hidden', decision !== 'workshop');
     }
 
     function handleRevInitPhoto(e) {
@@ -2846,29 +2905,6 @@
         document.getElementById('rev-init-photo-preview').innerHTML = `<img src="${revInitPhotoData}" class="w-12 h-12 rounded-xl object-cover border border-slate-300" />`;
       };
       reader.readAsDataURL(file);
-    }
-
-    function confirmInitialStep() {
-      const desc = document.getElementById('rev-init-desc').value.trim();
-      if (!desc) {
-        showToast('Ingresa la descripción inicial de la revisión.', 'error');
-        return;
-      }
-      const m = appState.machines.find(x => x.id === currentMachineId);
-      if (m && revInitialDecision === 'workshop') {
-        const ws = document.getElementById('rev-init-workshop-select').value;
-        m.status = 'En Taller';
-        m.warehouse = ws;
-        m.clientId = '';
-        m.locationId = '';
-        saveState();
-        renderMachines();
-        document.getElementById('rev-work-location-badge').textContent = `En Taller (${ws})`;
-      } else {
-        document.getElementById('rev-work-location-badge').textContent = 'Revisando en el Lugar';
-      }
-      document.getElementById('rev-work-started-at').textContent = 'Iniciada (Chile): ' + formatChileDisplayDateTime(new Date());
-      switchRevisionStep('work');
     }
 
     function handleWorkProcessPhotos(e) {
@@ -2889,33 +2925,223 @@
       if (hint) hint.textContent = `Bodega ${wh}`;
       const sel = document.getElementById('log-part-select');
       if (!sel) return;
-      const available = (appState.parts || []).filter(p => p.warehouse === wh);
-      sel.innerHTML = available.length
-        ? available.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.sku)} - ${escapeHtml(p.name)} (Stock: ${p.stock})</option>`).join('')
-        : '<option value="">Sin repuestos en esta bodega</option>';
+      const list = (appState.parts || []).filter(p => p.warehouse === wh);
+      sel.innerHTML = list.length
+        ? list.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.sku)} - ${escapeHtml(p.name)} (Stock: ${p.stock})</option>`).join('')
+        : `<option value="">Sin repuestos en Bodega ${escapeHtml(wh)}</option>`;
     }
 
     function addUsedPartToLog() {
-      const partId = document.getElementById('log-part-select').value;
-      const qty = Math.max(1, parseInt(document.getElementById('log-part-qty').value, 10) || 1);
-      const part = appState.parts.find(p => p.id === partId);
-      if (!part) return;
-      if (part.stock < qty) {
+      const pid = document.getElementById('log-part-select')?.value;
+      const qty = Math.max(1, parseInt(document.getElementById('log-part-qty')?.value, 10) || 1);
+      const part = (appState.parts || []).find(p => p.id === pid);
+      if (!part) {
+        showToast('Selecciona un repuesto disponible en la bodega.', 'error');
+        return;
+      }
+      if (Number(part.stock) < qty) {
         showToast(`Stock insuficiente en Bodega ${part.warehouse} (Disponible: ${part.stock}).`, 'error');
         return;
       }
-      revUsedPartsDraft.push({ partId: part.id, sku: part.sku, name: part.name, qty, warehouse: part.warehouse });
+      revUsedPartsDraft.push({
+        partId: part.id,
+        sku: part.sku,
+        name: part.name,
+        qty,
+        warehouse: part.warehouse,
+        deducted: false
+      });
       renderUsedPartsDraft();
     }
 
     function renderUsedPartsDraft() {
       const list = document.getElementById('log-used-parts-list');
       if (!list) return;
-      list.innerHTML = revUsedPartsDraft.map((item, idx) => `
-        <div class="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs">
-          <span class="font-bold text-[#243360]">${escapeHtml(item.sku)} - ${escapeHtml(item.name)} (x${item.qty})</span>
+      list.innerHTML = revUsedPartsDraft.map((p, idx) => `
+        <div class="flex items-center justify-between bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-xs">
+          <span class="font-bold text-[#243360]">${escapeHtml(p.sku)} - ${escapeHtml(p.name)} x${p.qty} (Bodega ${escapeHtml(p.warehouse)})</span>
           <button type="button" onclick="revUsedPartsDraft.splice(${idx},1);renderUsedPartsDraft();" class="text-rose-600 font-bold"><i class="fa-solid fa-xmark"></i></button>
         </div>`).join('');
+    }
+
+    function confirmInitialStep() {
+      const m = appState.machines.find(x => x.id === currentMachineId);
+      if (!m) return;
+      const desc = document.getElementById('rev-init-desc').value.trim();
+      if (!desc) {
+        showToast('Ingresa la descripción inicial de la falla o revisión.', 'error');
+        return;
+      }
+      const alreadyInWarehouseOrWorkshop = !m.clientId || m.status === 'En Taller' || m.status === 'Bodega';
+      if (revInitialDecision === 'workshop' || alreadyInWarehouseOrWorkshop) {
+        const ws = revInitialDecision === 'workshop'
+          ? document.getElementById('rev-init-workshop-select').value
+          : (m.warehouse || 'Chillán');
+        m.status = 'En Taller';
+        m.warehouse = ws;
+        m.clientId = '';
+        m.locationId = '';
+        revInitialDecision = 'workshop';
+        document.getElementById('rev-work-location-badge').textContent = `En Taller (${ws})`;
+        document.getElementById('rev-escalate-workshop-box').classList.add('hidden');
+        saveState();
+        renderMachines();
+      } else {
+        if (m.status === 'Operativa') m.status = 'Mantenimiento';
+        document.getElementById('rev-work-location-badge').textContent = 'Revisando en el Lugar';
+        document.getElementById('rev-escalate-workshop-box').classList.remove('hidden');
+      }
+      document.getElementById('rev-work-started-at').textContent = 'Iniciada (Chile): ' + formatChileDisplayDateTime(new Date());
+      renderWorkStepsHistory();
+      switchRevisionStep('work');
+    }
+
+    function openNewLogModal() {
+      const m = appState.machines.find(x => x.id === currentMachineId);
+      if (!m) return;
+      populateAllWarehouseSelects();
+      document.getElementById('rev-modal-title').innerHTML = `<i class="fa-solid fa-clipboard-check text-[#F2B705]"></i><span>Revisión Técnica — ${escapeHtml(m.code)}</span>`;
+
+      const isInWarehouseOrWorkshop = !m.clientId || m.status === 'En Taller' || m.status === 'Bodega';
+
+      if (m.activeRevision) {
+        const draft = m.activeRevision;
+        revActiveEditingLogId = draft.logId || null;
+        revInitPhotoData = draft.initPhotoData || '';
+        revFinalPhotoData = '';
+        revWorkPhotosDraft = [...(draft.workPhotosDraft || [])];
+        revUsedPartsDraft = JSON.parse(JSON.stringify(draft.usedPartsDraft || []));
+        revWorkStepsDraft = JSON.parse(JSON.stringify(draft.workStepsDraft || []));
+        revInitialDecision = isInWarehouseOrWorkshop ? 'workshop' : (draft.initialDecision || 'onsite');
+
+        document.getElementById('rev-tech').value = draft.tech || (currentSession ? currentSession.name : '');
+        if (draft.techWarehouse) document.getElementById('rev-tech-warehouse').value = draft.techWarehouse;
+        document.getElementById('rev-init-desc').value = draft.initDesc || '';
+        document.getElementById('rev-init-photo-preview').innerHTML = revInitPhotoData
+          ? `<img src="${revInitPhotoData}" class="w-12 h-12 rounded-xl object-cover border border-slate-300" />`
+          : '';
+        document.getElementById('rev-work-notes').value = '';
+        document.getElementById('rev-work-photos-preview').innerHTML = revWorkPhotosDraft
+          .map(src => `<img src="${src}" class="w-14 h-14 rounded-xl object-cover border border-slate-300" />`).join('');
+        document.getElementById('rev-final-desc').value = '';
+        document.getElementById('rev-final-photo-preview').innerHTML = '';
+
+        selectInitialDecision(revInitialDecision);
+        if (isInWarehouseOrWorkshop) {
+          const targetWs = draft.workshop || m.warehouse || 'Chillán';
+          document.getElementById('rev-init-workshop-select').value = targetWs;
+          document.getElementById('rev-work-location-badge').textContent = `En Taller (${targetWs})`;
+          document.getElementById('rev-escalate-workshop-box').classList.add('hidden');
+        } else {
+          document.getElementById('rev-work-location-badge').textContent = 'Revisando en el Lugar';
+          document.getElementById('rev-escalate-workshop-box').classList.remove('hidden');
+        }
+        document.getElementById('rev-work-started-at').textContent = draft.startedAtText || ('Iniciada (Chile): ' + formatChileDisplayDateTime(new Date()));
+        renderWorkStepsHistory();
+        populateLogPartsDropdown();
+        renderUsedPartsDraft();
+        switchRevisionStep('work');
+        document.getElementById('modal-new-log').classList.remove('hidden');
+        return;
+      }
+
+      revActiveEditingLogId = null;
+      revInitPhotoData = '';
+      revFinalPhotoData = '';
+      revWorkPhotosDraft = [];
+      revUsedPartsDraft = [];
+      revWorkStepsDraft = [];
+      revInitialDecision = isInWarehouseOrWorkshop ? 'workshop' : 'onsite';
+      document.getElementById('rev-tech').value = currentSession ? currentSession.name : '';
+      if (currentSession?.warehouse) document.getElementById('rev-tech-warehouse').value = currentSession.warehouse;
+      document.getElementById('rev-init-desc').value = '';
+      document.getElementById('rev-init-photo-preview').innerHTML = '';
+      document.getElementById('rev-work-notes').value = '';
+      document.getElementById('rev-work-photos-preview').innerHTML = '';
+      document.getElementById('rev-work-history-list').innerHTML = '';
+      document.getElementById('rev-final-desc').value = '';
+      document.getElementById('rev-final-photo-preview').innerHTML = '';
+      selectInitialDecision(revInitialDecision);
+      if (isInWarehouseOrWorkshop) {
+        document.getElementById('rev-init-workshop-select').value = m.warehouse || 'Chillán';
+      }
+      populateLogPartsDropdown();
+      renderUsedPartsDraft();
+      switchRevisionStep('init');
+      document.getElementById('modal-new-log').classList.remove('hidden');
+    }
+
+    function renderWorkStepsHistory() {
+      const list = document.getElementById('rev-work-history-list');
+      const counter = document.getElementById('rev-work-steps-counter');
+      if (counter) counter.textContent = `${revWorkStepsDraft.length} etapa(s)`;
+      if (!list) return;
+      list.innerHTML = revWorkStepsDraft.map((st, idx) => `
+        <div class="bg-white px-3 py-2 rounded-xl border border-slate-200 text-xs space-y-1.5">
+          <div class="flex items-center justify-between text-[10px] font-bold text-slate-400">
+            <span>Etapa #${idx + 1} • ${escapeHtml(st.tech || '')}${st.locationText ? ' • ' + escapeHtml(st.locationText) : ''}</span>
+            <span>${escapeHtml(st.date || '')}</span>
+          </div>
+          <p class="text-slate-700 font-medium">${escapeHtml(st.notes || '')}</p>
+          ${Array.isArray(st.photos) && st.photos.length ? `<div class="flex flex-wrap gap-1.5">${st.photos.map(src => `<img src="${escapeHtml(src)}" onclick="openLightbox(this.src, 'Etapa #${idx + 1}')" class="w-11 h-11 rounded-lg object-cover border border-slate-300 cursor-pointer" />`).join('')}</div>` : ''}
+        </div>`).join('');
+    }
+
+    function buildStructuredRevisionSteps(m, initDesc, tech, extraWorkNotes = '', finalDesc = '') {
+      const steps = [];
+      const info = getClientAndLocation(m);
+      const startedText = (document.getElementById('rev-work-started-at')?.textContent || '').replace('Iniciada (Chile): ', '').trim() || formatChileDisplayDateTime(new Date());
+
+      if (initDesc || revInitPhotoData) {
+        steps.push({
+          stage: 'Diagnóstico',
+          title: 'Diagnóstico Inicial',
+          date: startedText,
+          tech,
+          locationText: `${info.clientName} - ${info.locationName}`,
+          description: initDesc || 'Inicio de revisión técnica.',
+          photos: revInitPhotoData ? [revInitPhotoData] : []
+        });
+      }
+
+      (revWorkStepsDraft || []).forEach((st, idx) => {
+        steps.push({
+          stage: `Avance #${idx + 1}`,
+          title: `Avance de Trabajo #${idx + 1}`,
+          date: st.date || '',
+          tech: st.tech || tech,
+          locationText: st.locationText || `${info.clientName} - ${info.locationName}`,
+          description: st.notes || '',
+          photos: Array.isArray(st.photos) ? [...st.photos] : []
+        });
+      });
+
+      if (extraWorkNotes || (revWorkPhotosDraft && revWorkPhotosDraft.length > 0)) {
+        const nextNum = (revWorkStepsDraft || []).length + 1;
+        steps.push({
+          stage: `Avance #${nextNum}`,
+          title: `Avance de Trabajo #${nextNum}`,
+          date: formatChileDisplayDateTime(new Date()),
+          tech,
+          locationText: `${info.clientName} - ${info.locationName}`,
+          description: extraWorkNotes || 'Registro fotográfico de proceso.',
+          photos: [...(revWorkPhotosDraft || [])]
+        });
+      }
+
+      if (finalDesc || revFinalPhotoData) {
+        steps.push({
+          stage: 'Cierre Final',
+          title: 'Cierre y Resolución Final',
+          date: formatChileDisplayDateTime(new Date()),
+          tech,
+          locationText: `${info.clientName} - ${info.locationName}`,
+          description: finalDesc,
+          photos: revFinalPhotoData ? [revFinalPhotoData] : []
+        });
+      }
+
+      return steps;
     }
 
     function toggleEscalateWorkshopSelector() {
@@ -2926,50 +3152,228 @@
       const m = appState.machines.find(x => x.id === currentMachineId);
       if (!m) return;
       const ws = document.getElementById('rev-escalate-workshop-select').value;
+      const initDesc = document.getElementById('rev-init-desc').value.trim();
+      const workNotes = document.getElementById('rev-work-notes').value.trim();
+      const tech = document.getElementById('rev-tech').value.trim() || (currentSession ? currentSession.name : 'Técnico');
+      const techWarehouse = document.getElementById('rev-tech-warehouse').value;
+      const nowDisplay = formatChileDisplayDateTime(new Date());
+      const nowLocal = getChileNowDateTimeLocal();
+      const prevInfo = getClientAndLocation(m);
+
+      if (workNotes || revWorkPhotosDraft.length > 0) {
+        revWorkStepsDraft.push({
+          date: nowDisplay,
+          tech,
+          locationText: `${prevInfo.clientName} - ${prevInfo.locationName}`,
+          notes: workNotes || 'Registro fotográfico en terreno antes de derivar a taller.',
+          photos: [...revWorkPhotosDraft]
+        });
+        revWorkPhotosDraft = [];
+      }
+
+      // Trasladar máquina a la dirección del Taller / Bodega designada y mantenerla en proceso
       m.status = 'En Taller';
       m.warehouse = ws;
       m.clientId = '';
       m.locationId = '';
-      saveState();
-      renderMachines();
-      document.getElementById('rev-work-location-badge').textContent = `En Taller (${ws})`;
+      revInitialDecision = 'workshop';
+
+      revWorkStepsDraft.push({
+        date: nowDisplay,
+        tech,
+        locationText: `Bodega Regional ${ws} - Taller ${ws}`,
+        notes: `Derivada a Taller ${ws} para continuar revisión.`,
+        photos: []
+      });
+
+      const steps = buildStructuredRevisionSteps(m, initDesc, tech, '', '');
+      const photos = [];
+      steps.forEach(st => {
+        (st.photos || []).forEach(u => photos.push({ url: u, stage: st.stage }));
+      });
+
+      const info = getClientAndLocation(m);
+      const combinedNotes = [
+        initDesc ? `Diagnóstico: ${initDesc}` : '',
+        ...revWorkStepsDraft.map((st, i) => `Avance #${i + 1} (${st.date}): ${st.notes}`)
+      ].filter(Boolean).join(' | ');
+
+      m.logs = m.logs || [];
+      let logId = m.activeRevision?.logId || revActiveEditingLogId;
+      let existingLog = logId ? m.logs.find(l => l.id === logId) : null;
+
+      if (existingLog) {
+        existingLog.date = nowLocal;
+        existingLog.type = `En Revisión - Taller ${ws}`;
+        existingLog.tech = tech;
+        existingLog.locationText = `${info.clientName} - ${info.locationName}`;
+        existingLog.notes = combinedNotes;
+        existingLog.steps = steps;
+        existingLog.partsUsed = JSON.parse(JSON.stringify(revUsedPartsDraft));
+        existingLog.photos = photos;
+      } else {
+        logId = 'log-' + Date.now();
+        m.logs.unshift({
+          id: logId,
+          date: nowLocal,
+          type: `En Revisión - Taller ${ws}`,
+          tech,
+          locationText: `${info.clientName} - ${info.locationName}`,
+          notes: combinedNotes,
+          steps,
+          partsUsed: JSON.parse(JSON.stringify(revUsedPartsDraft)),
+          photos
+        });
+      }
+
+      revUsedPartsDraft.forEach(u => {
+        if (!u.deducted) {
+          const p = appState.parts.find(x => x.id === u.partId);
+          if (p) p.stock = Math.max(0, Number(p.stock) - Number(u.qty));
+          u.deducted = true;
+        }
+      });
+
+      m.activeRevision = {
+        logId,
+        tech,
+        techWarehouse,
+        initDesc,
+        initPhotoData: revInitPhotoData,
+        workPhotosDraft: [],
+        usedPartsDraft: JSON.parse(JSON.stringify(revUsedPartsDraft)),
+        workStepsDraft: JSON.parse(JSON.stringify(revWorkStepsDraft)),
+        initialDecision: 'workshop',
+        workshop: ws,
+        startedAtText: document.getElementById('rev-work-started-at').textContent || `Iniciada (Chile): ${nowDisplay}`
+      };
+
       document.getElementById('rev-escalate-selector-panel').classList.add('hidden');
-      showToast(`Equipo derivado a Taller ${ws}.`);
+      document.getElementById('rev-escalate-workshop-box').classList.add('hidden');
+
+      saveState();
+      closeModal('modal-new-log');
+      openLifecycleModal(m.id);
+      renderMachines();
+      renderParts();
+      showToast(`Equipo derivado a Taller ${ws}. Revisión guardada en espera de continuar trabajo.`);
     }
 
-    function saveWorkProgressAndPause() {
+    function persistCurrentRevisionProgress(closeAfterSave) {
       const m = appState.machines.find(x => x.id === currentMachineId);
       if (!m) return;
       const initDesc = document.getElementById('rev-init-desc').value.trim();
       const workNotes = document.getElementById('rev-work-notes').value.trim();
       const tech = document.getElementById('rev-tech').value.trim() || 'Técnico';
+      const techWarehouse = document.getElementById('rev-tech-warehouse').value;
       const info = getClientAndLocation(m);
+      const nowDisplay = formatChileDisplayDateTime(new Date());
+      const nowLocal = getChileNowDateTimeLocal();
+
+      if (!closeAfterSave && !workNotes && revWorkPhotosDraft.length === 0) {
+        showToast('Escribe una descripción o agrega una foto para guardar el avance.', 'error');
+        return;
+      }
+
       if (m.status === 'Operativa') m.status = 'Mantenimiento';
 
+      if (workNotes || revWorkPhotosDraft.length > 0) {
+        revWorkStepsDraft.push({
+          date: nowDisplay,
+          tech,
+          locationText: `${info.clientName} - ${info.locationName}`,
+          notes: workNotes || 'Avance fotográfico registrado.',
+          photos: [...revWorkPhotosDraft]
+        });
+        revWorkPhotosDraft = [];
+        document.getElementById('rev-work-notes').value = '';
+        document.getElementById('rev-work-photos-preview').innerHTML = '';
+      }
+
+      const steps = buildStructuredRevisionSteps(m, initDesc, tech, '', '');
       const photos = [];
-      if (revInitPhotoData) photos.push({ url: revInitPhotoData, stage: 'Inicial' });
-      revWorkPhotosDraft.forEach(u => photos.push({ url: u, stage: 'Proceso' }));
+      steps.forEach(st => {
+        (st.photos || []).forEach(u => photos.push({ url: u, stage: st.stage }));
+      });
+
+      const combinedNotes = [
+        initDesc ? `Diagnóstico: ${initDesc}` : '',
+        ...revWorkStepsDraft.map((st, i) => `Avance #${i + 1} (${st.date}): ${st.notes}`)
+      ].filter(Boolean).join(' | ') || 'Revisión iniciada en proceso.';
 
       m.logs = m.logs || [];
-      m.logs.unshift({
-        id: 'log-' + Date.now(),
-        date: getChileNowDateTimeLocal(),
-        type: 'Avance de Revisión (En Proceso)',
-        tech,
-        locationText: `${info.clientName} - ${info.locationName}`,
-        notes: [initDesc, workNotes].filter(Boolean).join(' | '),
-        partsUsed: [...revUsedPartsDraft],
-        photos
-      });
+      let logId = m.activeRevision?.logId || revActiveEditingLogId;
+      let existingLog = logId ? m.logs.find(l => l.id === logId) : null;
+
+      if (existingLog) {
+        existingLog.date = nowLocal;
+        existingLog.type = 'Avance de Revisión (En Proceso)';
+        existingLog.tech = tech;
+        existingLog.locationText = `${info.clientName} - ${info.locationName}`;
+        existingLog.notes = combinedNotes;
+        existingLog.steps = steps;
+        existingLog.partsUsed = JSON.parse(JSON.stringify(revUsedPartsDraft));
+        existingLog.photos = photos;
+      } else {
+        logId = 'log-' + Date.now();
+        revActiveEditingLogId = logId;
+        m.logs.unshift({
+          id: logId,
+          date: nowLocal,
+          type: 'Avance de Revisión (En Proceso)',
+          tech,
+          locationText: `${info.clientName} - ${info.locationName}`,
+          notes: combinedNotes,
+          steps,
+          partsUsed: JSON.parse(JSON.stringify(revUsedPartsDraft)),
+          photos
+        });
+      }
+
       revUsedPartsDraft.forEach(u => {
-        const p = appState.parts.find(x => x.id === u.partId);
-        if (p) p.stock = Math.max(0, Number(p.stock) - Number(u.qty));
+        if (!u.deducted) {
+          const p = appState.parts.find(x => x.id === u.partId);
+          if (p) p.stock = Math.max(0, Number(p.stock) - Number(u.qty));
+          u.deducted = true;
+        }
       });
+
+      m.activeRevision = {
+        logId,
+        tech,
+        techWarehouse,
+        initDesc,
+        initPhotoData: revInitPhotoData,
+        workPhotosDraft: [],
+        usedPartsDraft: JSON.parse(JSON.stringify(revUsedPartsDraft)),
+        workStepsDraft: JSON.parse(JSON.stringify(revWorkStepsDraft)),
+        initialDecision: revInitialDecision,
+        workshop: revInitialDecision === 'workshop' ? document.getElementById('rev-init-workshop-select').value : '',
+        startedAtText: document.getElementById('rev-work-started-at').textContent
+      };
+
       saveState();
-      closeModal('modal-new-log');
-      openLifecycleModal(m.id);
       renderMachines();
-      showToast('Avance guardado en la Hoja de Vida.');
+      renderParts();
+      populateLogPartsDropdown();
+
+      if (closeAfterSave) {
+        closeModal('modal-new-log');
+        openLifecycleModal(m.id);
+        showToast('Proceso guardado. Puedes volver más tarde a terminarlo.');
+      } else {
+        renderWorkStepsHistory();
+        filterLifecycleTimeline();
+        showToast(`Avance #${revWorkStepsDraft.length} guardado en la revisión.`);
+      }
+    }
+
+    function saveWorkStepInPlace() {
+      persistCurrentRevisionProgress(false);
+    }
+
+    function saveWorkProgressAndPause() {
+      persistCurrentRevisionProgress(true);
     }
 
     function proceedToFinishStep() {
@@ -3041,32 +3445,65 @@
         }
       }
 
-      const photos = [];
-      if (revInitPhotoData) photos.push({ url: revInitPhotoData, stage: 'Inicial' });
-      revWorkPhotosDraft.forEach(u => photos.push({ url: u, stage: 'Proceso' }));
-      if (revFinalPhotoData) photos.push({ url: revFinalPhotoData, stage: 'Final' });
-
       const initDesc = document.getElementById('rev-init-desc').value.trim();
       const workNotes = document.getElementById('rev-work-notes').value.trim();
       const tech = document.getElementById('rev-tech').value.trim() || 'Técnico';
       const info = getClientAndLocation(m);
 
-      m.logs = m.logs || [];
-      m.logs.unshift({
-        id: 'log-' + Date.now(),
-        date: getChileNowDateTimeLocal(),
-        type: 'Revisión Técnica Completada',
-        tech,
-        locationText: `${info.clientName} - ${info.locationName}`,
-        notes: [initDesc ? `Diagnóstico: ${initDesc}` : '', workNotes ? `Proceso: ${workNotes}` : '', `Cierre: ${finalDesc}`].filter(Boolean).join(' | '),
-        partsUsed: [...revUsedPartsDraft],
-        photos
+      const steps = buildStructuredRevisionSteps(m, initDesc, tech, workNotes, finalDesc);
+      const photos = [];
+      steps.forEach(st => {
+        (st.photos || []).forEach(u => photos.push({ url: u, stage: st.stage }));
       });
 
+      const allStepNotes = [
+        ...revWorkStepsDraft.map((st, i) => `Avance #${i + 1}: ${st.notes}`),
+        workNotes ? `Proceso: ${workNotes}` : ''
+      ].filter(Boolean).join(' | ');
+
+      const fullNotes = [
+        initDesc ? `Diagnóstico: ${initDesc}` : '',
+        allStepNotes,
+        `Cierre: ${finalDesc}`
+      ].filter(Boolean).join(' | ');
+
+      m.logs = m.logs || [];
+      const existingLogId = m.activeRevision?.logId || revActiveEditingLogId;
+      const existingLog = existingLogId ? m.logs.find(l => l.id === existingLogId) : null;
+
+      if (existingLog) {
+        existingLog.date = getChileNowDateTimeLocal();
+        existingLog.type = 'Revisión Técnica Completada';
+        existingLog.tech = tech;
+        existingLog.locationText = `${info.clientName} - ${info.locationName}`;
+        existingLog.notes = fullNotes;
+        existingLog.steps = steps;
+        existingLog.partsUsed = JSON.parse(JSON.stringify(revUsedPartsDraft));
+        existingLog.photos = photos;
+      } else {
+        m.logs.unshift({
+          id: 'log-' + Date.now(),
+          date: getChileNowDateTimeLocal(),
+          type: 'Revisión Técnica Completada',
+          tech,
+          locationText: `${info.clientName} - ${info.locationName}`,
+          notes: fullNotes,
+          steps,
+          partsUsed: JSON.parse(JSON.stringify(revUsedPartsDraft)),
+          photos
+        });
+      }
+
       revUsedPartsDraft.forEach(u => {
-        const p = appState.parts.find(x => x.id === u.partId);
-        if (p) p.stock = Math.max(0, Number(p.stock) - Number(u.qty));
+        if (!u.deducted) {
+          const p = appState.parts.find(x => x.id === u.partId);
+          if (p) p.stock = Math.max(0, Number(p.stock) - Number(u.qty));
+          u.deducted = true;
+        }
       });
+
+      delete m.activeRevision;
+      revActiveEditingLogId = null;
 
       saveState();
       closeModal('modal-new-log');
@@ -3878,6 +4315,8 @@
     // =========================================================================
     function openConfigModal() {
       if (!isManager()) return;
+      cancelEditWarehouseConfig();
+      cancelEditUserConfig();
       populateAllWarehouseSelects();
       renderConfigWarehousesAndUsers();
       const shareUrl = window.location.href.split('?')[0];
@@ -3892,23 +4331,79 @@
       document.getElementById('config-warehouses-list').innerHTML = (appState.warehouses || []).map(w => `
         <div class="flex items-center justify-between px-3 py-2 bg-[#f8fafe] rounded-xl border border-[#dfe6f5] text-xs font-bold text-[#243360]">
           <span>Bodega ${escapeHtml(w)}</span>
-          <button type="button" onclick="deleteWarehouseConfig('${escapeHtml(w)}')" class="text-rose-600"><i class="fa-solid fa-trash"></i></button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="editWarehouseConfig('${escapeHtml(w)}')" title="Modificar bodega" class="px-2 py-1 rounded-lg bg-white hover:bg-[#fef8e6] text-[#243360] border border-slate-200"><i class="fa-solid fa-pen"></i></button>
+            <button type="button" onclick="deleteWarehouseConfig('${escapeHtml(w)}')" title="Eliminar bodega" class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600"><i class="fa-solid fa-trash"></i></button>
+          </div>
         </div>`).join('');
 
       document.getElementById('config-users-list').innerHTML = (appState.users || []).map(u => `
         <div class="flex items-center justify-between px-3 py-2 bg-[#f8fafe] rounded-xl border border-[#dfe6f5] text-xs">
           <div>
             <p class="font-extrabold text-[#243360]">${escapeHtml(u.name)}</p>
-            <p class="text-[10px] text-slate-500">${u.role === 'gerencia' ? '👑 Gerencia' : '🛠️ Técnico • ' + escapeHtml(u.warehouse)}</p>
+            <p class="text-[10px] text-slate-500">${u.role === 'gerencia' ? '👑 Gerencia' : '🛠️ Técnico • ' + escapeHtml(u.warehouse)} • Clave: <span class="font-mono font-bold text-[#243360]">${escapeHtml(u.password || '')}</span></p>
           </div>
-          <button type="button" onclick="deleteUserConfig('${escapeHtml(u.id)}')" class="text-rose-600"><i class="fa-solid fa-trash"></i></button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="editUserConfig('${escapeHtml(u.id)}')" title="Modificar usuario" class="px-2 py-1 rounded-lg bg-white hover:bg-[#fef8e6] text-[#243360] border border-slate-200"><i class="fa-solid fa-pen"></i></button>
+            <button type="button" onclick="deleteUserConfig('${escapeHtml(u.id)}')" title="Eliminar usuario" class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600"><i class="fa-solid fa-trash"></i></button>
+          </div>
         </div>`).join('');
+    }
+
+    function editWarehouseConfig(w) {
+      if (!isManager()) return;
+      document.getElementById('config-edit-warehouse-original').value = w;
+      document.getElementById('config-new-warehouse').value = w;
+      document.getElementById('config-warehouse-form-label').textContent = 'Modificar Bodega:';
+      document.getElementById('btn-submit-warehouse-config').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> <span>Guardar</span>';
+      document.getElementById('btn-cancel-edit-warehouse').classList.remove('hidden');
+      document.getElementById('config-new-warehouse').focus();
+    }
+
+    function cancelEditWarehouseConfig() {
+      const orig = document.getElementById('config-edit-warehouse-original');
+      if (orig) orig.value = '';
+      const inp = document.getElementById('config-new-warehouse');
+      if (inp) inp.value = '';
+      const lbl = document.getElementById('config-warehouse-form-label');
+      if (lbl) lbl.textContent = 'Nueva Bodega:';
+      const btn = document.getElementById('btn-submit-warehouse-config');
+      if (btn) btn.innerHTML = '<i class="fa-solid fa-plus"></i> <span>Agregar</span>';
+      const cancelBtn = document.getElementById('btn-cancel-edit-warehouse');
+      if (cancelBtn) cancelBtn.classList.add('hidden');
     }
 
     function saveWarehouseFromConfig(e) {
       e.preventDefault();
+      if (!isManager()) return;
+      const original = document.getElementById('config-edit-warehouse-original').value.trim();
       const name = document.getElementById('config-new-warehouse').value.trim();
-      if (!name || appState.warehouses.includes(name)) return;
+      if (!name) return;
+
+      if (original) {
+        if (original !== name && appState.warehouses.includes(name)) {
+          showToast('Ya existe una bodega con ese nombre.', 'error');
+          return;
+        }
+        appState.warehouses = appState.warehouses.map(w => (w === original ? name : w));
+        (appState.machines || []).forEach(m => { if (m.warehouse === original) m.warehouse = name; });
+        (appState.parts || []).forEach(p => { if (p.warehouse === original) p.warehouse = name; });
+        (appState.users || []).forEach(u => { if (u.warehouse === original) u.warehouse = name; });
+        (appState.partsMovements || []).forEach(mv => {
+          if (mv.sourceWarehouse === original) mv.sourceWarehouse = name;
+          if (mv.targetWarehouse === original) mv.targetWarehouse = name;
+        });
+        cancelEditWarehouseConfig();
+        saveState();
+        populateAllWarehouseSelects();
+        renderConfigWarehousesAndUsers();
+        renderMachines();
+        renderParts();
+        showToast('Bodega actualizada correctamente.');
+        return;
+      }
+
+      if (appState.warehouses.includes(name)) return;
       appState.warehouses.push(name);
       document.getElementById('config-new-warehouse').value = '';
       saveState();
@@ -3918,7 +4413,7 @@
     }
 
     function deleteWarehouseConfig(w) {
-      if (appState.warehouses.length <= 1) return;
+      if (!isManager() || appState.warehouses.length <= 1) return;
       appState.warehouses = appState.warehouses.filter(x => x !== w);
       saveState();
       populateAllWarehouseSelects();
@@ -3930,29 +4425,94 @@
       document.getElementById('config-user-warehouse-box').classList.toggle('hidden', role === 'gerencia');
     }
 
+    function editUserConfig(uid) {
+      if (!isManager()) return;
+      const u = (appState.users || []).find(x => x.id === uid);
+      if (!u) return;
+      populateAllWarehouseSelects();
+      document.getElementById('config-edit-user-id').value = u.id;
+      document.getElementById('config-user-name').value = u.name;
+      document.getElementById('config-user-password').value = u.password || '';
+      document.getElementById('config-user-role').value = u.role || 'tecnico';
+      if (u.warehouse) document.getElementById('config-user-warehouse').value = u.warehouse;
+      toggleConfigUserWarehouse();
+      document.getElementById('config-user-form-label').textContent = `Modificando Usuario: ${u.name}`;
+      document.getElementById('btn-submit-user-config').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> <span>Guardar Cambios</span>';
+      document.getElementById('btn-cancel-edit-user').classList.remove('hidden');
+      document.getElementById('config-user-name').focus();
+    }
+
+    function cancelEditUserConfig() {
+      const idInp = document.getElementById('config-edit-user-id');
+      if (idInp) idInp.value = '';
+      const nameInp = document.getElementById('config-user-name');
+      if (nameInp) nameInp.value = '';
+      const passInp = document.getElementById('config-user-password');
+      if (passInp) passInp.value = '';
+      const roleSel = document.getElementById('config-user-role');
+      if (roleSel) {
+        roleSel.value = 'tecnico';
+        toggleConfigUserWarehouse();
+      }
+      const lbl = document.getElementById('config-user-form-label');
+      if (lbl) lbl.textContent = 'Nuevo Usuario';
+      const btn = document.getElementById('btn-submit-user-config');
+      if (btn) btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> <span>Agregar Usuario</span>';
+      const cancelBtn = document.getElementById('btn-cancel-edit-user');
+      if (cancelBtn) cancelBtn.classList.add('hidden');
+    }
+
     function saveUserFromConfig(e) {
       e.preventDefault();
+      if (!isManager()) return;
+      const editId = document.getElementById('config-edit-user-id').value.trim();
       const name = document.getElementById('config-user-name').value.trim();
       const password = document.getElementById('config-user-password').value.trim();
       const role = document.getElementById('config-user-role').value;
       const warehouse = document.getElementById('config-user-warehouse').value;
+      if (!name || !password) return;
+
+      if (editId) {
+        const existing = (appState.users || []).find(u => u.id === editId);
+        if (existing) {
+          existing.name = name;
+          existing.password = password;
+          existing.role = role;
+          existing.warehouse = warehouse;
+        }
+        cancelEditUserConfig();
+        saveState();
+        renderConfigWarehousesAndUsers();
+        const dl = document.getElementById('all-users-presets');
+        if (dl) {
+          dl.innerHTML = (appState.users || DEFAULT_USERS)
+            .map(u => `<option value="${escapeHtml(u.name)}"></option>`)
+            .join('');
+        }
+        showToast('Usuario modificado correctamente.');
+        return;
+      }
+
       appState.users.push({ id: 'usr-' + Date.now(), name, password, role, warehouse });
       document.getElementById('config-user-name').value = '';
       document.getElementById('config-user-password').value = '';
       saveState();
       renderConfigWarehousesAndUsers();
+      const dl = document.getElementById('all-users-presets');
+      if (dl) {
+        dl.innerHTML = (appState.users || DEFAULT_USERS)
+          .map(u => `<option value="${escapeHtml(u.name)}"></option>`)
+          .join('');
+      }
       showToast('Usuario creado.');
     }
 
     function deleteUserConfig(uid) {
-      if (appState.users.length <= 1) return;
+      if (!isManager() || appState.users.length <= 1) return;
       appState.users = appState.users.filter(u => u.id !== uid);
       saveState();
       renderConfigWarehousesAndUsers();
     }
-
-    function cancelEditWarehouseConfig() {}
-    function cancelEditUserConfig() {}
 
     function copyAppShareUrl() {
       const inp = document.getElementById('app-share-url-input');
