@@ -2036,7 +2036,7 @@
     };
 
     let appState = loadState();
-    let currentSession = loadSession();
+    let currentSession = null;
     let currentMachineId = null;
     let pendingMachinePhoto = null;
     let pendingAssignPhoto = null;
@@ -2144,12 +2144,7 @@
     // 2. AUTENTICACIÓN, PERMISOS (GERENCIA VS TÉCNICO) Y UTILIDADES
     // =========================================================================
     function loadSession() {
-      try {
-        const raw = localStorage.getItem(SESSION_KEY);
-        return raw ? JSON.parse(raw) : null;
-      } catch (e) {
-        return null;
-      }
+      return null;
     }
 
     function isManager() {
@@ -2163,7 +2158,9 @@
     }
 
     function openAuthScreen() {
-      document.getElementById('login-username').value = currentSession?.name || '';
+      currentSession = null;
+      localStorage.removeItem(SESSION_KEY);
+      document.getElementById('login-username').value = '';
       document.getElementById('login-password').value = '';
       document.getElementById('auth-screen')?.classList.remove('hidden');
     }
@@ -2172,10 +2169,13 @@
       event.preventDefault();
       const username = document.getElementById('login-username').value.trim();
       const password = document.getElementById('login-password').value.trim();
-      if (!username || !password) return;
+      if (!username || !password) {
+        showToast('Debes ingresar usuario y clave de acceso.', 'error');
+        return;
+      }
 
       const userMatch = (appState.users || []).find(
-        u => u.name.toLowerCase() === username.toLowerCase() && String(u.password || '1234') === password
+        u => u.name.toLowerCase() === username.toLowerCase() && String(u.password || '') !== '' && String(u.password) === password
       );
 
       if (!userMatch) {
@@ -2189,7 +2189,6 @@
         role: userMatch.role,
         warehouse: userMatch.warehouse || (appState.warehouses?.[0] || 'Chillán')
       };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
       document.getElementById('auth-screen')?.classList.add('hidden');
       applyRolePermissionsToUI();
       renderMachines();
@@ -5338,17 +5337,7 @@
       renderClients();
       renderGlobalBitacora();
 
-      if (currentSession) {
-        document.getElementById('auth-screen')?.classList.add('hidden');
-        applyRolePermissionsToUI();
-        if (pendingDeepLinkMachineCode) {
-          const code = pendingDeepLinkMachineCode;
-          pendingDeepLinkMachineCode = null;
-          openMachineByScannedCode(code);
-        }
-      } else {
-        openAuthScreen();
-      }
+      openAuthScreen();
     });
   </script>
 
