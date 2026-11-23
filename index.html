@@ -4192,13 +4192,20 @@
       const bridge = window.lykosBridge;
       if (!bridge) return;
 
-      if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-        bridge.setSyncStatus('local', 'Local');
-        return;
-      }
+      const defaultFirebaseConfig = {
+        apiKey: "AIzaSyDdyRXT2rJbfqxwy5z68SsmxfZpmT5Vmp0",
+        authDomain: "lykos-maquinas.firebaseapp.com",
+        projectId: "lykos-maquinas",
+        storageBucket: "lykos-maquinas.firebasestorage.app",
+        messagingSenderId: "262454560769",
+        appId: "1:262454560769:web:47fe09b0e3fa7d4ac31800",
+        measurementId: "G-2JHC2BVEMV"
+      };
 
       try {
-        const firebaseConfig = JSON.parse(__firebase_config);
+        const firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config)
+          ? JSON.parse(__firebase_config)
+          : defaultFirebaseConfig;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'lykos-vending-shared';
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
